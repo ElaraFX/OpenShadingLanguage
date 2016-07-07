@@ -2162,7 +2162,6 @@ ShadingSystemImpl::ShaderGroupBegin (string_view groupname,
             // Zero-pad if we parsed fewer values than we needed
             intvals.resize (type.numelements()*type.aggregate, 0);
             ASSERT (int(type.numelements())*type.aggregate == int(intvals.size()));
-            Parameter (paramname, type, &intvals[0], lockgeom);
         } else if (type.basetype == TypeDesc::FLOAT) {
             floatvals.clear ();
             floatvals.reserve (vals_to_preallocate);
@@ -2182,7 +2181,6 @@ ShadingSystemImpl::ShaderGroupBegin (string_view groupname,
             // Zero-pad if we parsed fewer values than we needed
             floatvals.resize (type.numelements()*type.aggregate, 0);
             ASSERT (int(type.numelements())*type.aggregate == int(floatvals.size()));
-            Parameter (paramname, type, &floatvals[0], lockgeom);
         } else if (type.basetype == TypeDesc::STRING) {
             stringvals.clear ();
             stringvals.reserve (vals_to_preallocate);
@@ -2212,7 +2210,6 @@ ShadingSystemImpl::ShaderGroupBegin (string_view groupname,
             // Zero-pad if we parsed fewer values than we needed
             stringvals.resize (type.numelements()*type.aggregate, ustring());
             ASSERT (int(type.numelements())*type.aggregate == int(stringvals.size()));
-            Parameter (paramname, type, &stringvals[0], lockgeom);
         }
 
         if (Strutil::parse_prefix (p, "[[")) {  // hints
@@ -3292,5 +3289,3 @@ ei_osl_bind_interpolated_param (void *sg_, const void *name, long long type,
     }
     return 0;  // no such user data
 }
-
-
