@@ -14,6 +14,7 @@ SET ( liboslexec_srcs
           shadeimage.cpp
           backendllvm.cpp
           llvm_gen.cpp llvm_instance.cpp llvm_util.cpp
+          backendglsl.cpp
     )
 
 # oslcomp symbols used in oslexec
