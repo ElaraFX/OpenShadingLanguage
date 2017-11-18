@@ -117,6 +117,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <llvm/Transforms/Utils/UnifyFunctionExitNodes.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
+#include <llvm/Analysis/Passes.h> // LLVM 3.4 specifc?
+
 OSL_NAMESPACE_ENTER
 
 namespace pvt {
@@ -640,12 +642,87 @@ LLVM_Util::setup_optimization_passes (int optlevel)
 #if OSL_LLVM_VERSION <= 34
         // For LLVM 3.0 and higher, llvm_optimize 1-3 means to use the
         // same set of optimizations as clang -O1, -O2, -O3
-        llvm::PassManagerBuilder builder;
-        builder.OptLevel = optlevel;
-        builder.Inliner = llvm::createFunctionInliningPass();
+        //llvm::PassManagerBuilder builder;
+        //builder.OptLevel = optlevel;
+        //builder.Inliner = llvm::createFunctionInliningPass();
         // builder.DisableUnrollLoops = true;
-        builder.populateFunctionPassManager (fpm);
-        builder.populateModulePassManager (mpm);
+        //builder.populateFunctionPassManager (fpm);
+        //builder.populateModulePassManager (mpm);
+
+		// Add TypeBasedAliasAnalysis before BasicAliasAnalysis so that
+		// BasicAliasAnalysis wins if they disagree. This is intended to help
+		// support "obvious" type-punning idioms.
+		mpm.add(llvm::createTypeBasedAliasAnalysisPass());
+		mpm.add(llvm::createBasicAliasAnalysisPass());
+
+		//mpm.add(llvm::createGlobalOptimizerPass());		// Optimize out global vars
+		mpm.add(llvm::createIPSCCPPass());					// IP SCCP
+		//mpm.add(llvm::createDeadArgEliminationPass());	// Dead argument elimination
+		mpm.add(llvm::createInstructionCombiningPass());	// Clean up after IPCP & DAE
+		mpm.add(llvm::createCFGSimplificationPass());		// Clean up after IPCP & DAE
+
+		// Start of CallGraph SCC passes.
+		mpm.add(llvm::createPruneEHPass());					// Remove dead EH info
+		mpm.add(llvm::createFunctionInliningPass(optlevel > 2 ? 275 : 225));
+
+		mpm.add(llvm::createFunctionAttrsPass());			// Set readonly/readnone attrs
+		if (optlevel > 2) {
+			mpm.add(llvm::createArgumentPromotionPass());
+		}
+
+		// Start of function pass.
+		// Break up aggregate allocas, using SSAUpdater.
+		mpm.add(llvm::createSROAPass(/*RequiresDomTree*/ false));
+		mpm.add(llvm::createEarlyCSEPass());						// Catch trivial redundancies
+		mpm.add(llvm::createJumpThreadingPass());					// Thread jumps.
+		mpm.add(llvm::createCorrelatedValuePropagationPass());		// Propagate conditionals
+		mpm.add(llvm::createCFGSimplificationPass());				// Merge & remove BBs
+		mpm.add(llvm::createInstructionCombiningPass());			// Combine silly seq's
+
+		mpm.add(llvm::createTailCallEliminationPass());			// Eliminate tail calls
+		mpm.add(llvm::createCFGSimplificationPass());			// Merge & remove BBs
+		mpm.add(llvm::createReassociatePass());					// Reassociate expressions
+		mpm.add(llvm::createLoopRotatePass());					// Rotate Loop
+		mpm.add(llvm::createLICMPass());						// Hoist loop invariants
+		mpm.add(llvm::createLoopUnswitchPass(optlevel < 3));
+		mpm.add(llvm::createInstructionCombiningPass());
+		mpm.add(llvm::createIndVarSimplifyPass());				// Canonicalize indvars
+		mpm.add(llvm::createLoopIdiomPass());					// Recognize idioms like memset.
+		mpm.add(llvm::createLoopDeletionPass());				// Delete dead loops
+
+		mpm.add(llvm::createLoopUnrollPass());					// Unroll small loops
+
+		if (optlevel > 1) {
+			mpm.add(llvm::createGVNPass());						// Remove redundancies
+		}
+		mpm.add(llvm::createMemCpyOptPass());					// Remove memcpy / form memset
+		mpm.add(llvm::createSCCPPass());						// Constant prop with SCCP
+
+		// Run instcombine after redundancy elimination to exploit opportunities
+		// opened up by them.
+		mpm.add(llvm::createInstructionCombiningPass());
+		mpm.add(llvm::createJumpThreadingPass());				// Thread jumps
+		mpm.add(llvm::createCorrelatedValuePropagationPass());
+		mpm.add(llvm::createDeadStoreEliminationPass());		// Delete dead stores
+
+		mpm.add(llvm::createLoopRerollPass());
+
+		mpm.add(llvm::createAggressiveDCEPass());				// Delete dead instructions
+		mpm.add(llvm::createCFGSimplificationPass());			// Merge & remove BBs
+		mpm.add(llvm::createInstructionCombiningPass());		// Clean up after everything.
+
+		// FIXME: We shouldn't bother with this anymore.
+		//mpm.add(llvm::createStripDeadPrototypesPass());		// Get rid of dead prototypes
+
+		// GlobalOpt already deletes dead functions and globals, at -O2 try a
+		// late pass of GlobalDCE.  It is capable of deleting dead cycles.
+		if (optlevel > 1) {
+			//mpm.add(llvm::createGlobalDCEPass());
+			mpm.add(llvm::createConstantMergePass());			// Merge dup global constants
+		}
+
+		// Try to make stuff into registers one last time.
+        mpm.add (llvm::createPromoteMemoryToRegisterPass());
 #endif
 
     } else {
