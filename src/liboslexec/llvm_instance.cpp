@@ -1075,8 +1075,19 @@ BackendLLVM::run ()
     ll.internalize_module_functions ("ei_osl_", external_function_names, entry_function_names);
 
     // Optimize the LLVM IR unless it's a do-nothing group.
-    if (! group().does_nothing())
+    if (! group().does_nothing()) {
+		if (shadingsys().llvm_optimize() >= 1) {
+			ll.function_optimize_begin();
+			for (int layer = 0; layer < nlayers; ++layer) {
+				llvm::Function *f = funcs[layer];
+				if (f != NULL) {
+					ll.function_optimize_do(f);
+				}
+			}
+			ll.function_optimize_end();
+		}
         ll.do_optimize();
+	}
 
     m_stat_llvm_opt_time += timer.lap();
 

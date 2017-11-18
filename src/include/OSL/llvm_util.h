@@ -194,6 +194,11 @@ public:
     /// Run the optimization passes.
     void do_optimize ();
 
+	/// Run function specific optimization passes.
+	void function_optimize_begin();
+	void function_optimize_do (llvm::Function *func);
+	void function_optimize_end();
+
     /// Retrieve a callable pointer to the JITed version of a function.
     /// This will JIT the function if it hasn't already done so. Be sure
     /// you have already called do_optimize() if you want optimization.

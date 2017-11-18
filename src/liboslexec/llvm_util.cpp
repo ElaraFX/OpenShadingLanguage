@@ -652,6 +652,17 @@ LLVM_Util::setup_optimization_passes (int optlevel)
 		// Add TypeBasedAliasAnalysis before BasicAliasAnalysis so that
 		// BasicAliasAnalysis wins if they disagree. This is intended to help
 		// support "obvious" type-punning idioms.
+		fpm.add(llvm::createTypeBasedAliasAnalysisPass());
+		fpm.add(llvm::createBasicAliasAnalysisPass());
+
+		fpm.add(llvm::createCFGSimplificationPass());
+		fpm.add(llvm::createSROAPass(/*RequiresDomTree*/ true));
+		fpm.add(llvm::createEarlyCSEPass());
+		fpm.add(llvm::createLowerExpectIntrinsicPass());
+
+		// Add TypeBasedAliasAnalysis before BasicAliasAnalysis so that
+		// BasicAliasAnalysis wins if they disagree. This is intended to help
+		// support "obvious" type-punning idioms.
 		mpm.add(llvm::createTypeBasedAliasAnalysisPass());
 		mpm.add(llvm::createBasicAliasAnalysisPass());
 
@@ -769,6 +780,26 @@ LLVM_Util::do_optimize ()
 #else
     m_llvm_module_passes->run (*module());
 #endif
+}
+
+
+
+void
+LLVM_Util::function_optimize_begin()
+{
+	m_llvm_func_passes->doInitialization();
+}
+
+void
+LLVM_Util::function_optimize_do (llvm::Function *func)
+{
+	m_llvm_func_passes->run(*func);
+}
+
+void
+LLVM_Util::function_optimize_end()
+{
+	m_llvm_func_passes->doFinalization();
 }
 
 
