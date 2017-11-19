@@ -1076,9 +1076,6 @@ BackendLLVM::run ()
 
     // Optimize the LLVM IR unless it's a do-nothing group.
     if (! group().does_nothing()) {
-		if (shadingsys().llvm_optimize() > 3) {
-			ll.do_optimize_functions();
-		}
         ll.do_optimize();
 	}
 
