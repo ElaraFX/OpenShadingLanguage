@@ -638,7 +638,7 @@ LLVM_Util::setup_optimization_passes (int optlevel)
 #endif
 #endif
 
-    if (optlevel >= 1 && optlevel <= 4) {
+    if (optlevel >= 1 && optlevel <= 3) {
 #if OSL_LLVM_VERSION <= 34
         // For LLVM 3.0 and higher, llvm_optimize 1-3 means to use the
         // same set of optimizations as clang -O1, -O2, -O3
