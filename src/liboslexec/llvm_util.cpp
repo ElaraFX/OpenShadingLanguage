@@ -638,7 +638,7 @@ LLVM_Util::setup_optimization_passes (int optlevel)
 #endif
 #endif
 
-    if (optlevel >= 1 && optlevel <= 3) {
+    if (optlevel >= 1 && optlevel <= 4) {
 #if OSL_LLVM_VERSION <= 34
         // For LLVM 3.0 and higher, llvm_optimize 1-3 means to use the
         // same set of optimizations as clang -O1, -O2, -O3
@@ -649,16 +649,18 @@ LLVM_Util::setup_optimization_passes (int optlevel)
         //builder.populateFunctionPassManager (fpm);
         //builder.populateModulePassManager (mpm);
 
-		// Add TypeBasedAliasAnalysis before BasicAliasAnalysis so that
-		// BasicAliasAnalysis wins if they disagree. This is intended to help
-		// support "obvious" type-punning idioms.
-		fpm.add(llvm::createTypeBasedAliasAnalysisPass());
-		fpm.add(llvm::createBasicAliasAnalysisPass());
+		if (optlevel > 3) {
+			// Add TypeBasedAliasAnalysis before BasicAliasAnalysis so that
+			// BasicAliasAnalysis wins if they disagree. This is intended to help
+			// support "obvious" type-punning idioms.
+			fpm.add(llvm::createTypeBasedAliasAnalysisPass());
+			fpm.add(llvm::createBasicAliasAnalysisPass());
 
-		fpm.add(llvm::createCFGSimplificationPass());
-		fpm.add(llvm::createSROAPass(/*RequiresDomTree*/ true));
-		fpm.add(llvm::createEarlyCSEPass());
-		fpm.add(llvm::createLowerExpectIntrinsicPass());
+			fpm.add(llvm::createCFGSimplificationPass());
+			fpm.add(llvm::createSROAPass(/*RequiresDomTree*/ true));
+			fpm.add(llvm::createEarlyCSEPass());
+			fpm.add(llvm::createLowerExpectIntrinsicPass());
+		}
 
 		// Add TypeBasedAliasAnalysis before BasicAliasAnalysis so that
 		// BasicAliasAnalysis wins if they disagree. This is intended to help
@@ -785,20 +787,15 @@ LLVM_Util::do_optimize ()
 
 
 void
-LLVM_Util::function_optimize_begin()
+LLVM_Util::do_optimize_functions ()
 {
 	m_llvm_func_passes->doInitialization();
-}
-
-void
-LLVM_Util::function_optimize_do (llvm::Function *func)
-{
-	m_llvm_func_passes->run(*func);
-}
-
-void
-LLVM_Util::function_optimize_end()
-{
+	for (llvm::Module::iterator iter = module()->begin(); iter != module()->end(); iter++) {
+		llvm::Function *f = (llvm::Function *)(iter);
+		if (f != NULL) {
+			m_llvm_func_passes->run(*f);
+		}
+	}
 	m_llvm_func_passes->doFinalization();
 }
 
