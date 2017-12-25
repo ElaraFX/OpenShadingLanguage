@@ -2,11 +2,19 @@
 # ER executable
 
 INCLUDE_DIRECTORIES (${ELARA_SRC_DIR}/liber/include)
+INCLUDE_DIRECTORIES (${ZLIB_INCLUDE_DIR})
+
+add_definitions(-DNOCRYPT)
 
 FILE (GLOB h_src ${ELARA_SRC_DIR}/er/*.h)
 FILE (GLOB cpp_src ${ELARA_SRC_DIR}/er/*.cpp)
 
-ADD_EXECUTABLE (er ${h_src} ${cpp_src})
+FILE (GLOB minizip_h_src ${ELARA_SRC_DIR}/er/minizip/*.h)
+FILE (GLOB minizip_c_src ${ELARA_SRC_DIR}/er/minizip/*.c)
+
+SOURCE_GROUP("minizip" FILES ${minizip_h_src} ${minizip_c_src})
+
+ADD_EXECUTABLE (er ${h_src} ${cpp_src} ${minizip_h_src} ${minizip_c_src})
 TARGET_LINK_LIBRARIES (er liber)
 
 if (MSVC)
