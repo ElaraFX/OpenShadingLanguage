@@ -24,6 +24,9 @@ static ustring op_continue("continue");
 static ustring op_return("return");
 static ustring op_exit("exit");
 static ustring op_useparam("useparam");
+static ustring op_assign("assign");
+static ustring op_add("add");
+static ustring op_mul("mul");
 
 BackendGLSL::BackendGLSL(
 	ShadingSystemImpl & shadingsys, 
@@ -72,44 +75,49 @@ void BackendGLSL::pop_block()
 	begin_code("}\n");
 }
 
+void BackendGLSL::gen_symbol(Symbol & sym)
+{
+	add_code(" ");
+
+	Symbol* dealiased = sym.dealias();
+	std::string mangled_name = dealiased->mangled();
+
+	if (dealiased->is_constant() && dealiased->data() != NULL)
+	{
+		TypeDesc t = dealiased->typespec().simpletype();
+		int n = int(t.aggregate * t.numelements());
+		if (t.basetype == TypeDesc::FLOAT) {
+			for (int j = 0; j < n; ++j) {
+				add_code(j ? " " : "");
+				add_code(Strutil::format("%.9f", ((float *)dealiased->data())[j]));
+			}
+		} else if (t.basetype == TypeDesc::INT) {
+			for (int j = 0; j < n; ++j) {
+				add_code(j ? " " : "");
+				add_code(Strutil::format("%d", ((int *)dealiased->data())[j]));
+			}
+		} else if (t.basetype == TypeDesc::STRING) {
+			for (int j = 0; j < n; ++j) {
+				add_code(j ? " " : "");
+				add_code("\"");
+				add_code(Strutil::escape_chars(((ustring *)dealiased->data())[j].string()));
+				add_code("\"");
+			}
+		}
+	}
+	else
+	{
+		add_code(mangled_name);
+	}
+}
+
 bool BackendGLSL::gen_code(const Opcode & op)
 {
 	begin_code(op.opname().string());
 	for (int i = 0; i < op.nargs(); ++i)
 	{
 		Symbol & sym = *opargsym(op, i);
-		add_code(" ");
-
-		Symbol* dealiased = sym.dealias();
-		std::string mangled_name = dealiased->mangled();
-
-		if (dealiased->is_constant() && dealiased->data() != NULL)
-		{
-			TypeDesc t = dealiased->typespec().simpletype();
-			int n = int(t.aggregate * t.numelements());
-			if (t.basetype == TypeDesc::FLOAT) {
-				for (int j = 0; j < n; ++j) {
-					add_code(j ? " " : "");
-					add_code(Strutil::format("%.9f", ((float *)dealiased->data())[j]));
-				}
-			} else if (t.basetype == TypeDesc::INT) {
-				for (int j = 0; j < n; ++j) {
-					add_code(j ? " " : "");
-					add_code(Strutil::format("%d", ((int *)dealiased->data())[j]));
-				}
-			} else if (t.basetype == TypeDesc::STRING) {
-				for (int j = 0; j < n; ++j) {
-					add_code(j ? " " : "");
-					add_code("\"");
-					add_code(Strutil::escape_chars(((ustring *)dealiased->data())[j].string()));
-					add_code("\"");
-				}
-			}
-		}
-		else
-		{
-			add_code(mangled_name);
-		}
+		gen_symbol(sym);
 	}
 	add_code("\n");
 	return true;
@@ -127,6 +135,7 @@ void BackendGLSL::call_layer(int layer, bool unconditional)
 
     ShaderInstance *parent = group()[layer];
     //llvm::Value *layerfield = layer_run_ref(layer_remap(layer));
+	int layerfield = m_layer_remap[layer];
 
     std::string name = Strutil::format ("%s_%d", parent->layername().c_str(),
                                         parent->id());
@@ -134,7 +143,7 @@ void BackendGLSL::call_layer(int layer, bool unconditional)
 	if (!unconditional)
 	{
 		begin_code("if !run[");
-		add_code(name);
+		add_code(Strutil::format("%d", layerfield));
 		add_code("]\n");
 
 		push_block();
@@ -309,6 +318,51 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
+	else if (op.opname() == op_assign)
+	{
+		Symbol & result = *opargsym(op, 0);
+		Symbol & src = *opargsym(op, 1);
+
+		begin_code("");
+		gen_symbol(result);
+		add_code(" = ");
+		gen_symbol(src);
+		add_code("\n");
+
+		return true;
+	}
+	else if (op.opname() == op_add)
+	{
+		Symbol& result = *opargsym (op, 0);
+		Symbol& a = *opargsym (op, 1);
+		Symbol& b = *opargsym (op, 2);
+
+		begin_code("");
+		gen_symbol(result);
+		add_code(" = ");
+		gen_symbol(a);
+		add_code(" + ");
+		gen_symbol(b);
+		add_code("\n");
+
+		return true;
+	}
+	else if (op.opname() == op_mul)
+	{
+		Symbol& result = *opargsym (op, 0);
+		Symbol& a = *opargsym (op, 1);
+		Symbol& b = *opargsym (op, 2);
+
+		begin_code("");
+		gen_symbol(result);
+		add_code(" = ");
+		gen_symbol(a);
+		add_code(" * ");
+		gen_symbol(b);
+		add_code("\n");
+
+		return true;
+	}
 	else
 	{
 		return gen_code(op);
@@ -454,7 +508,11 @@ bool BackendGLSL::build_instance(bool groupentry)
     // Note that the GroupData* is passed as a void*.
     std::string unique_layer_name = Strutil::format ("%s_%d", inst()->layername(), inst()->id());
 
-	begin_code("layer ");
+	if (inst()->entry_layer()) {
+		begin_code("entry layer ");
+	} else {
+		begin_code("layer ");
+	}
 	add_code(unique_layer_name);
 	add_code("\n");
 	push_block();
@@ -463,13 +521,14 @@ bool BackendGLSL::build_instance(bool groupentry)
 
 	// TODO: Handle early return of entry layer...
 	//llvm::Value *layerfield = layer_run_ref(m_layer_remap[layer()]);
+	int layerfield = m_layer_remap[layer()];
     if (inst()->entry_layer()) {
         // For entry layers, we need an extra check to see if it already
         // ran. If it has, do an early return. Otherwise, set the 'ran' flag
         // and then run the layer.
         //llvm::Value *executed = ll.op_eq (ll.op_load (layerfield), ll.constant_bool(true));
 		begin_code("if run[");
-		add_code(unique_layer_name);
+		add_code(Strutil::format("%d", layerfield));
 		add_code("]\n");
 
 		push_block();
@@ -477,8 +536,8 @@ bool BackendGLSL::build_instance(bool groupentry)
 		pop_block();
     }
     // Mark this layer as executed
-	begin_code("[");
-	add_code(unique_layer_name);
+	begin_code("run[");
+	add_code(Strutil::format("%d", layerfield));
 	add_code("] = true\n");
 
 	// Setup the symbols
