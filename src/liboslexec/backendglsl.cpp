@@ -125,22 +125,8 @@ void BackendGLSL::call_layer(int layer, bool unconditional)
     // if it's run unconditionally.
     // The code in the parent layer itself will set its 'executed' flag.
 
-    //llvm::Value *args[2];
-    //args[0] = sg_ptr ();
-    //args[1] = groupdata_ptr ();
-
     ShaderInstance *parent = group()[layer];
-    //llvm::Value *trueval = ll.constant_bool(true);
     //llvm::Value *layerfield = layer_run_ref(layer_remap(layer));
-    //llvm::BasicBlock *then_block = NULL, *after_block = NULL;
-    //if (! unconditional) {
-        //llvm::Value *executed = ll.op_load (layerfield);
-        //executed = ll.op_ne (executed, trueval);
-        //then_block = ll.new_basic_block ("");
-        //after_block = ll.new_basic_block ("");
-        //ll.op_branch (executed, then_block, after_block);
-        // insert point is now then_block
-    //}
 
     std::string name = Strutil::format ("%s_%d", parent->layername().c_str(),
                                         parent->id());
@@ -165,14 +151,6 @@ void BackendGLSL::call_layer(int layer, bool unconditional)
 		add_code(name);
 		add_code("\n");
 	}
-
-    // Mark the call as a fast call
-    //llvm::Value *funccall = ll.call_function (name.c_str(), args, 2);
-    //if (!parent->entry_layer())
-        //ll.mark_fast_func_call (funccall);
-
-    //if (! unconditional)
-        //ll.op_branch (after_block);  // also moves insert point
 }
 
 void BackendGLSL::run_connected_layers(
@@ -231,6 +209,8 @@ bool BackendGLSL::build_op(int opnum)
 
 	if (op.opname() == op_if)
 	{
+		Symbol& cond = *(inst()->argsymbol(op.firstarg()));
+
 		gen_code(op);
 
 		push_block();
@@ -268,12 +248,7 @@ bool BackendGLSL::build_op(int opnum)
 	else if (op.opname() == op_dowhile || op.opname() == op_for || op.opname() == op_while)
 	{
 		// Branch on the condition, to our blocks
-		//llvm::BasicBlock* cond_block = rop.ll.new_basic_block ("cond");
-		//llvm::BasicBlock* body_block = rop.ll.new_basic_block ("body");
-		//llvm::BasicBlock* step_block = rop.ll.new_basic_block ("step");
-		//llvm::BasicBlock* after_block = rop.ll.new_basic_block ("");
-		// Save the step and after block pointers for possible break/continue
-		//rop.ll.push_loop (step_block, after_block);
+		Symbol& cond = *(inst()->argsymbol(op.firstarg()));
 
 		// Initialization (will be empty except for "for" loops)
 		build_block (opnum + 1, op.jump(0));
@@ -291,15 +266,9 @@ bool BackendGLSL::build_op(int opnum)
 
 		// Body of loop
 		build_block (op.jump(1), op.jump(2)/*, body_block*/);
-		//rop.ll.op_branch (step_block);
 
 		// Step
 		build_block (op.jump(2), op.jump(3)/*, step_block*/);
-		//rop.ll.op_branch (cond_block);
-
-		// Continue on with the previous flow
-		//rop.ll.set_insert_point (after_block);
-		//rop.ll.pop_loop ();
 
 		return true;
 	}
@@ -310,8 +279,6 @@ bool BackendGLSL::build_op(int opnum)
 		} else {  // continue
 			//rop.ll.op_branch (rop.ll.loop_step_block());
 		}
-		//llvm::BasicBlock* next_block = rop.ll.new_basic_block ("");
-		//rop.ll.set_insert_point (next_block);
 
 		return true;
 	}
@@ -325,8 +292,6 @@ bool BackendGLSL::build_op(int opnum)
 			// If it's a "return", jump to the exit point of the function.
 			//rop.ll.op_branch (rop.ll.return_block());
 		}
-		//llvm::BasicBlock* next_block = rop.ll.new_basic_block ("");
-		//rop.ll.set_insert_point (next_block);
 
 		return true;
 	}
@@ -363,7 +328,7 @@ bool BackendGLSL::build_block(int beginop, int endop)
                    op.opname() == op_end) {
             // Skip this op, it does nothing...
         } else {
-            shadingcontext()->error ("LLVMOSL: Unsupported op %s in layer %s\n",
+            shadingcontext()->error ("Unsupported op %s in layer %s\n",
                                      op.opname(), inst()->layername());
             return false;
         }
@@ -503,16 +468,18 @@ bool BackendGLSL::build_instance(bool groupentry)
         // ran. If it has, do an early return. Otherwise, set the 'ran' flag
         // and then run the layer.
         //llvm::Value *executed = ll.op_eq (ll.op_load (layerfield), ll.constant_bool(true));
-        //llvm::BasicBlock *then_block = ll.new_basic_block();
-        //llvm::BasicBlock *after_block = ll.new_basic_block();
-        //ll.op_branch (executed, then_block, after_block);
-        // insert point is now then_block
-        // we've already executed, so return early
-        //ll.op_return ();
-        //ll.set_insert_point (after_block);
+		begin_code("if run[");
+		add_code(unique_layer_name);
+		add_code("]\n");
+
+		push_block();
+		add_code("return\n");
+		pop_block();
     }
     // Mark this layer as executed
-    //ll.op_store (ll.constant_bool(true), layerfield);
+	begin_code("[");
+	add_code(unique_layer_name);
+	add_code("] = true\n");
 
 	// Setup the symbols
 	m_layers_already_run.clear ();
