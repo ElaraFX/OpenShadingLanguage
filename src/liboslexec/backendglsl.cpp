@@ -641,6 +641,8 @@ void BackendGLSL::build_init()
 	add_code(unique_name);
 	add_code("\n");
 
+	push_block();
+
     // Group init clears all the "layer_run" and "userdata_initialized" flags.
     if (m_num_used_layers > 1) {
         // TODO: Clear m_num_used_layers entries...
@@ -666,6 +668,8 @@ void BackendGLSL::build_init()
             }
         }
     }
+
+	pop_block();
 }
 
 void BackendGLSL::run()
@@ -702,6 +706,26 @@ void BackendGLSL::run()
             bool is_single_entry = (layer == (nlayers-1) && group().num_entry_layers() == 0);
             build_instance (is_single_entry);
         }
+    }
+
+	// Force the JIT to happen now and retrieve the JITed function pointers
+    // for the initialization and all public entry points.
+	std::string init_func_name = Strutil::format ("group_%d_init", group().id());
+	begin_code("call_layer ");
+	add_code(init_func_name);
+	add_code("\n");
+    for (int layer = 0; layer < nlayers; ++layer) {
+		set_inst (layer);
+		if (m_layer_remap[layer] != -1) {
+			std::string layer_func_name = Strutil::format ("%s_%d", inst()->layername(), inst()->id());
+			if (group().is_entry_layer(layer) || // User specified entry layer
+				(group().num_entry_layers() == 0 && 
+				layer == (nlayers - 1))) { // or the last layer as entry
+				begin_code("call_layer ");
+				add_code(layer_func_name);
+				add_code("\n");
+			}
+		}
     }
 }
 
