@@ -416,26 +416,13 @@ void BackendGLSL::assign_zero(const Symbol & sym)
     // N.B. derivsize() includes derivs, if there are any
     size_t align = sym.typespec().is_closure_based() ? sizeof(void*) :
                          sym.typespec().simpletype().basesize();
-	// TODO: Really memset it...
-	//ll.op_memset (llvm_void_ptr(sym), 0, len, (int)align);
     
 	Symbol* dealiased = sym.dealias();
     std::string mangled_name = dealiased->mangled();
     
-	begin_code(mangled_name);
-	add_code(" = 0\n");
-}
-
-void BackendGLSL::store_value(
-	const Symbol & sym, 
-	int arrayindex, 
-	int component)
-{
-	Symbol* dealiased = sym.dealias();
-    std::string mangled_name = dealiased->mangled();
-
-	begin_code(mangled_name);
-	add_code(Strutil::format("[%d][%d] = 0\n", arrayindex, component));
+	begin_code("memset(");
+	add_code(mangled_name);
+	add_code(Strutil::format(", 0, %d, %d);\n", len, (int)align));
 }
 
 void BackendGLSL::assign_initial_value(const Symbol & sym)
@@ -448,8 +435,6 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
         return;
     if (sym.typespec().is_closure_based() && sym.symtype() == SymTypeGlobal)
         return;
-
-    int arraylen = std::max (1, sym.typespec().arraylength());
 
     // Closures need to get their storage before anything can be
     // assigned to them.  Unless they are params, in which case we took
@@ -475,16 +460,42 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
         build_block (sym.initbegin(), sym.initend());
     } else {
         // Use default value
-        int num_components = sym.typespec().simpletype().aggregate;
-        TypeSpec elemtype = sym.typespec().elementtype();
-        for (int a = 0, c = 0; a < arraylen;  ++a) {
-            int arrind = sym.typespec().is_array() ? a : 0;
-            if (sym.typespec().is_closure_based())
-                continue;
-            for (int i = 0; i < num_components; ++i, ++c) {
-                store_value (sym, arrind, i);
-            }
-        }
+		if (!sym.typespec().is_closure_based()) {
+			Symbol* dealiased = sym.dealias();
+			std::string mangled_name = dealiased->mangled();
+
+			TypeSpec elemtype = sym.typespec().elementtype();
+
+			// Fill in the constant val
+			if (!sym.typespec().is_array()) {
+				begin_code(mangled_name);
+				if (elemtype.is_floatbased()) {
+					float float_val = ((float *)sym.data())[0];
+					add_code(Strutil::format(" = %.9f;\n", float_val));
+				} else if (elemtype.is_string()) {
+					ustring string_val = ((ustring *)sym.data())[0];
+					add_code(Strutil::format(" = %s;\n", string_val.c_str()));
+				} else if (elemtype.is_int()) {
+					int int_val = ((int *)sym.data())[0];
+					add_code(Strutil::format(" = %d;\n", int_val));
+				}
+			} else {
+				int arraylen = sym.typespec().arraylength();
+				for (int a = 0; a < arraylen; ++a) {
+					begin_code(mangled_name);
+					if (elemtype.is_floatbased()) {
+						float float_val = ((float *)sym.data())[0];
+						add_code(Strutil::format("[%d] = %.9f;\n", a, float_val));
+					} else if (elemtype.is_string()) {
+						ustring string_val = ((ustring *)sym.data())[0];
+						add_code(Strutil::format("[%d] = %s;\n", a, string_val.c_str()));
+					} else if (elemtype.is_int()) {
+						int int_val = ((int *)sym.data())[0];
+						add_code(Strutil::format("[%d] = %d;\n", a, int_val));
+					}
+				}
+			}
+		}
     }
 }
 
@@ -519,7 +530,6 @@ bool BackendGLSL::build_instance(bool groupentry)
 
 	// TODO: Handle "exit" with m_exit_instance_block here...
 
-	// TODO: Handle early return of entry layer...
 	//llvm::Value *layerfield = layer_run_ref(m_layer_remap[layer()]);
 	int layerfield = m_layer_remap[layer()];
     if (inst()->entry_layer()) {
@@ -659,12 +669,20 @@ void BackendGLSL::build_init()
         if (gi->unused() || gi->empty_instance())
             continue;
         FOREACH_PARAM (Symbol &sym, gi) {
-           if (sym.typespec().is_closure_based()) {
-                int arraylen = std::max (1, sym.typespec().arraylength());
-                for (int a = 0; a < arraylen;  ++a) {
-                    int arrind = sym.typespec().is_array() ? a : 0;
-                    store_value (sym, arrind, 0);
-                }
+			if (sym.typespec().is_closure_based()) {
+				Symbol* dealiased = sym.dealias();
+				std::string mangled_name = dealiased->mangled();
+
+				if (!sym.typespec().is_array()) {
+					begin_code(mangled_name);
+					add_code(" = 0;\n");
+				} else {
+					int arraylen = sym.typespec().arraylength();
+					for (int a = 0; a < arraylen; ++a) {
+						begin_code(mangled_name);
+						add_code(Strutil::format("[%d] = 0;\n", a));
+					}
+				}
             }
         }
     }

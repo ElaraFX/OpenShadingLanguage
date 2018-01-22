@@ -44,10 +44,6 @@ private:
 	bool build_block(int beginop, int endop);
 	void allocate_symbol(const Symbol & sym);
 	void assign_zero(const Symbol & sym);
-	void store_value(
-		const Symbol & sym, 
-		int arrayindex, 
-		int component);
 	void assign_initial_value(const Symbol & sym);
 	void gen_assign(const Symbol & a, const Symbol & b);
 	bool build_instance(bool groupentry);
