@@ -397,13 +397,22 @@ bool BackendGLSL::build_block(int beginop, int endop)
 	return true;
 }
 
-void BackendGLSL::allocate_symbol(const Symbol & sym)
+void BackendGLSL::get_or_allocate_symbol(const Symbol & sym)
 {
-	Symbol* dealiased = sym.dealias();
+	DASSERT ((sym.symtype() == SymTypeLocal || sym.symtype() == SymTypeTemp ||
+              sym.symtype() == SymTypeConst)
+             && "get_or_allocate_symbol should only be for local, tmp, const");
+
+    Symbol* dealiased = sym.dealias();
     std::string mangled_name = dealiased->mangled();
-    
-	begin_code(mangled_name);
-	add_code("\n");
+    std::set<std::string>::iterator iter = m_named_values.find(mangled_name);
+
+    if (iter == m_named_values.end()) {
+		begin_code("allocate ");
+		add_code(mangled_name);
+		add_code("\n");
+        m_named_values.insert(mangled_name);
+    }
 }
 
 void BackendGLSL::assign_zero(const Symbol & sym)
@@ -536,7 +545,6 @@ bool BackendGLSL::build_instance(bool groupentry)
         // For entry layers, we need an extra check to see if it already
         // ran. If it has, do an early return. Otherwise, set the 'ran' flag
         // and then run the layer.
-        //llvm::Value *executed = ll.op_eq (ll.op_load (layerfield), ll.constant_bool(true));
 		begin_code("if run[");
 		add_code(Strutil::format("%d", layerfield));
 		add_code("]\n");
@@ -551,6 +559,7 @@ bool BackendGLSL::build_instance(bool groupentry)
 	add_code("] = true\n");
 
 	// Setup the symbols
+	m_named_values.clear ();
 	m_layers_already_run.clear ();
 	BOOST_FOREACH (Symbol &s, inst()->symbols()) {
         // Skip constants -- we always inline scalar constants, and for
@@ -564,7 +573,7 @@ bool BackendGLSL::build_instance(bool groupentry)
 		// Allocate space for locals, temps, aggregate constants
         if (s.symtype() == SymTypeLocal || s.symtype() == SymTypeTemp ||
                 s.symtype() == SymTypeConst)
-            allocate_symbol (s);
+            get_or_allocate_symbol (s);
         // Set initial value for constants, closures, and strings that are
         // not parameters.
         if (s.symtype() != SymTypeParam && s.symtype() != SymTypeOutputParam &&
@@ -690,6 +699,40 @@ void BackendGLSL::build_init()
 	pop_block();
 }
 
+void BackendGLSL::type_groupdata()
+{
+	// TODO: Now add the array that tells which userdata have been initialized,
+    // and the space for the userdata values.
+
+	// For each layer in the group, add entries for all params that are
+    // connected or interpolated, and output params.  Also mark those
+    // symbols with their offset within the group struct.
+    for (int layer = 0;  layer < group().nlayers(); ++layer) {
+        ShaderInstance *inst = group()[layer];
+        if (inst->unused())
+            continue;
+        FOREACH_PARAM (Symbol &sym, inst) {
+            if (sym.typespec().is_structure())  // skip the struct symbol itself
+                continue;
+
+			Symbol *dealias = sym.dealias();
+			std::string mangled_name = dealias->mangled();
+
+			if (!sym.typespec().is_array()) {
+				begin_code("declare ");
+				begin_code(mangled_name);
+				add_code(";\n");
+			} else {
+				int arraylen = sym.typespec().arraylength();
+
+				begin_code("declare ");
+				begin_code(mangled_name);
+				add_code(Strutil::format("[%d];\n", arraylen));
+			}
+        }
+    }
+}
+
 void BackendGLSL::run()
 {
 	reset_code();
@@ -713,6 +756,9 @@ void BackendGLSL::run()
             m_layer_remap[layer] = m_num_used_layers++;
         }
     }
+
+	// Declare group data in in advance
+	type_groupdata();
 
     // Generate the LLVM IR for each layer.  Skip unused layers.
 	build_init();

@@ -42,15 +42,17 @@ private:
 		std::set<int> *already_run);
 	bool build_op(int opnum);
 	bool build_block(int beginop, int endop);
-	void allocate_symbol(const Symbol & sym);
+	void get_or_allocate_symbol(const Symbol & sym);
 	void assign_zero(const Symbol & sym);
 	void assign_initial_value(const Symbol & sym);
 	void gen_assign(const Symbol & a, const Symbol & b);
 	bool build_instance(bool groupentry);
 	void build_init();
+	void type_groupdata();
 
 	std::string m_code;					///< Generated code string
 	std::vector<int> m_layer_remap;     ///< Remapping of layer ordering
+	std::set<std::string> m_named_values;
 	std::set<int> m_layers_already_run; ///< List of layers run
     int m_num_used_layers;              ///< Number of layers actually used
 	int m_block_level;
