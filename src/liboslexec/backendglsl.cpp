@@ -720,13 +720,13 @@ void BackendGLSL::type_groupdata()
 
 			if (!sym.typespec().is_array()) {
 				begin_code("declare ");
-				begin_code(mangled_name);
+				add_code(mangled_name);
 				add_code(";\n");
 			} else {
 				int arraylen = sym.typespec().arraylength();
 
 				begin_code("declare ");
-				begin_code(mangled_name);
+				add_code(mangled_name);
 				add_code(Strutil::format("[%d];\n", arraylen));
 			}
         }
