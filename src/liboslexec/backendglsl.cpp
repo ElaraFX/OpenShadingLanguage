@@ -29,6 +29,8 @@ static ustring op_add("add");
 static ustring op_sub("sub");
 static ustring op_mul("mul");
 static ustring op_div("div");
+static ustring op_compref("compref");
+static ustring op_compassign("compassign");
 
 std::string format_var(const std::string & name)
 {
@@ -182,7 +184,7 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 bool BackendGLSL::gen_code(const Opcode & op)
 {
 	begin_code(op.opname().string());
-	add_code("(");
+	add_code(" (");
 	for (int i = 0; i < op.nargs(); ++i)
 	{
 		add_code((i != 0) ? ", " : "");
@@ -219,14 +221,14 @@ void BackendGLSL::call_layer(int layer, bool unconditional)
 		push_block();
 
 		begin_code(format_var(name));
-		add_code("();\n");
+		add_code("(sg);\n");
 		
 		pop_block();
 	}
 	else
 	{
 		begin_code(format_var(name));
-		add_code("();\n");
+		add_code("(sg);\n");
 	}
 }
 
@@ -400,7 +402,7 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(result);
 		add_code(" = ");
 		gen_symbol(src);
-		add_code("\n");
+		add_code(";\n");
 
 		return true;
 	}
@@ -416,7 +418,7 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(a);
 		add_code(" + ");
 		gen_symbol(b);
-		add_code("\n");
+		add_code(";\n");
 
 		return true;
 	}
@@ -432,7 +434,7 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(a);
 		add_code(" - ");
 		gen_symbol(b);
-		add_code("\n");
+		add_code(";\n");
 
 		return true;
 	}
@@ -448,7 +450,7 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(a);
 		add_code(" * ");
 		gen_symbol(b);
-		add_code("\n");
+		add_code(";\n");
 
 		return true;
 	}
@@ -464,7 +466,39 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(a);
 		add_code(" / ");
 		gen_symbol(b);
-		add_code("\n");
+		add_code(";\n");
+
+		return true;
+	}
+	else if (op.opname() == op_compref)
+	{
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& Val = *opargsym (op, 1);
+		Symbol& Index = *opargsym (op, 2);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = ");
+		gen_symbol(Val);
+		add_code("[");
+		gen_symbol(Index);
+		add_code("];\n");
+
+		return true;
+	}
+	else if (op.opname() == op_compassign)
+	{
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& Index = *opargsym (op, 1);
+		Symbol& Val = *opargsym (op, 2);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code("[");
+		gen_symbol(Index);
+		add_code("] = ");
+		gen_symbol(Val);
+		add_code(";\n");
 
 		return true;
 	}
@@ -629,7 +663,7 @@ bool BackendGLSL::build_instance(bool groupentry)
 		begin_code("void ");
 	}
 	add_code(unique_layer_name);
-	add_code("()\n");
+	add_code("(ShaderGlobals & sg)\n");
 	push_block();
 
 	// TODO: Handle "exit" with m_exit_instance_block here...
@@ -763,7 +797,7 @@ void BackendGLSL::build_init()
 
 	begin_code("void ");
 	add_code(unique_name);
-	add_code("()\n");
+	add_code("(ShaderGlobals & sg)\n");
 	push_block();
 
     // Group init clears all the "layer_run" and "userdata_initialized" flags.
