@@ -171,23 +171,20 @@ void BackendGLSL::call_layer(int layer, bool unconditional)
 
 	if (!unconditional)
 	{
-		begin_code("if !run[");
+		begin_code("if (!run[");
 		add_code(Strutil::format("%d", layerfield));
-		add_code("]\n");
-
+		add_code("])\n");
 		push_block();
 
-		begin_code("call_layer ");
-		add_code(name);
-		add_code("\n");
+		begin_code(name);
+		add_code("();\n");
 		
 		pop_block();
 	}
 	else
 	{
-		begin_code("call_layer ");
-		add_code(name);
-		add_code("\n");
+		begin_code(name);
+		add_code("();\n");
 	}
 }
 
@@ -333,6 +330,10 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
+	else if (op.opname() == op_end)
+	{
+		// Nothing to do
+	}
 	else if (op.opname() == op_useparam)
 	{
 		// If we have multiple params needed on this statement, don't waste
@@ -407,7 +408,7 @@ bool BackendGLSL::build_block(int beginop, int endop)
 			if (!build_op(opnum)) {
 				return false;
 			}
-        } else if (op.opname() == op_nop ||
+        } else if (op.opname() == op_nop || 
                    op.opname() == op_end) {
             // Skip this op, it does nothing...
         } else {
@@ -535,33 +536,19 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
     }
 }
 
-void BackendGLSL::gen_assign(const Symbol & a, const Symbol & b)
-{
-	Symbol* da = a.dealias();
-    std::string ma = da->mangled();
-
-	Symbol* db = b.dealias();
-    std::string mb = db->mangled();
-
-	begin_code(ma);
-	add_code(" = ");
-	add_code(mb);
-	add_code("\n");
-}
-
 bool BackendGLSL::build_instance(bool groupentry)
 {
 	// Make a layer function: void layer_func(ShaderGlobals*, GroupData*)
     // Note that the GroupData* is passed as a void*.
-    std::string unique_layer_name = Strutil::format ("%s_%d", inst()->layername(), inst()->id());
+    std::string unique_layer_name = Strutil::format("%s_%d", inst()->layername(), inst()->id());
 
 	if (inst()->entry_layer()) {
-		begin_code("entry layer ");
+		begin_code("__declspec(noinline) void ");
 	} else {
-		begin_code("layer ");
+		begin_code("void ");
 	}
 	add_code(unique_layer_name);
-	add_code("\n");
+	add_code("()\n");
 	push_block();
 
 	// TODO: Handle "exit" with m_exit_instance_block here...
@@ -572,18 +559,18 @@ bool BackendGLSL::build_instance(bool groupentry)
         // For entry layers, we need an extra check to see if it already
         // ran. If it has, do an early return. Otherwise, set the 'ran' flag
         // and then run the layer.
-		begin_code("if run[");
+		begin_code("if (run[");
 		add_code(Strutil::format("%d", layerfield));
-		add_code("]\n");
+		add_code("])\n");
 
 		push_block();
-		add_code("return\n");
+		add_code("return;\n");
 		pop_block();
     }
     // Mark this layer as executed
 	begin_code("run[");
 	add_code(Strutil::format("%d", layerfield));
-	add_code("] = true\n");
+	add_code("] = true;\n");
 
 	// Setup the symbols
 	m_named_values.clear ();
@@ -659,6 +646,7 @@ bool BackendGLSL::build_instance(bool groupentry)
     // inputs.
     for (int layer = this->layer()+1;  layer < group().nlayers();  ++layer) {
         ShaderInstance *child = group()[layer];
+		std::string dst_layer_name = Strutil::format("%s_%d", child->layername(), child->id());
         for (int c = 0;  c < child->nconnections();  ++c) {
             const Connection &con (child->connection (c));
             if (con.srclayer == this->layer()) {
@@ -667,7 +655,16 @@ bool BackendGLSL::build_instance(bool groupentry)
                 run_connected_layers (*srcsym, con.src.param, -1, NULL);
                 // FIXME -- I'm not sure I understand this.  Isn't this
                 // unnecessary if we wrote to the parameter ourself?
-                gen_assign (*dstsym, *srcsym);
+				Symbol* dst_dealiased = dstsym->dealias();
+				std::string dst_mangled = dst_layer_name + "__" + dst_dealiased->mangled();
+
+				Symbol* src_dealiased = srcsym->dealias();
+				std::string src_mangled = unique_layer_name + "__" + src_dealiased->mangled();
+
+				begin_code(dst_mangled);
+				add_code(" = ");
+				add_code(src_mangled);
+				add_code(";\n");
             }
         }
     }
@@ -683,10 +680,9 @@ void BackendGLSL::build_init()
     // Note that the GroupData* is passed as a void*.
     std::string unique_name = Strutil::format ("group_%d_init", group().id());
 
-	begin_code("init ");
+	begin_code("void ");
 	add_code(unique_name);
-	add_code("\n");
-
+	add_code("()\n");
 	push_block();
 
     // Group init clears all the "layer_run" and "userdata_initialized" flags.
@@ -704,10 +700,13 @@ void BackendGLSL::build_init()
         ShaderInstance *gi = group()[i];
         if (gi->unused() || gi->empty_instance())
             continue;
+
+		std::string unique_layer_name = Strutil::format("%s_%d", gi->layername(), gi->id());
+
         FOREACH_PARAM (Symbol &sym, gi) {
 			if (sym.typespec().is_closure_based()) {
 				Symbol* dealiased = sym.dealias();
-				std::string mangled_name = dealiased->mangled();
+				std::string mangled_name = unique_layer_name + "__" + dealiased->mangled();
 
 				if (!sym.typespec().is_array()) {
 					begin_code(mangled_name);
@@ -738,12 +737,15 @@ void BackendGLSL::type_groupdata()
         ShaderInstance *inst = group()[layer];
         if (inst->unused())
             continue;
+
+		std::string unique_layer_name = Strutil::format ("%s_%d", inst->layername(), inst->id());
+
         FOREACH_PARAM (Symbol &sym, inst) {
             if (sym.typespec().is_structure())  // skip the struct symbol itself
                 continue;
 
 			Symbol *dealias = sym.dealias();
-			std::string mangled_name = dealias->mangled();
+			std::string mangled_name = unique_layer_name + "__" + dealias->mangled();
 			gen_typespec(dealias->typespec(), mangled_name);
         }
     }
@@ -791,9 +793,8 @@ void BackendGLSL::run()
 	// Force the JIT to happen now and retrieve the JITed function pointers
     // for the initialization and all public entry points.
 	std::string init_func_name = Strutil::format ("group_%d_init", group().id());
-	begin_code("call_layer ");
-	add_code(init_func_name);
-	add_code("\n");
+	begin_code(init_func_name);
+	add_code("();\n");
     for (int layer = 0; layer < nlayers; ++layer) {
 		set_inst (layer);
 		if (m_layer_remap[layer] != -1) {
@@ -801,9 +802,8 @@ void BackendGLSL::run()
 			if (group().is_entry_layer(layer) || // User specified entry layer
 				(group().num_entry_layers() == 0 && 
 				layer == (nlayers - 1))) { // or the last layer as entry
-				begin_code("call_layer ");
-				add_code(layer_func_name);
-				add_code("\n");
+				begin_code(layer_func_name);
+				add_code("();\n");
 			}
 		}
     }

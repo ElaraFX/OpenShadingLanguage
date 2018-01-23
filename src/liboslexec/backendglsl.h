@@ -46,7 +46,6 @@ private:
 	void get_or_allocate_symbol(const Symbol & sym);
 	void assign_zero(const Symbol & sym);
 	void assign_initial_value(const Symbol & sym);
-	void gen_assign(const Symbol & a, const Symbol & b);
 	bool build_instance(bool groupentry);
 	void build_init();
 	void type_groupdata();
