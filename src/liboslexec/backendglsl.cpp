@@ -221,14 +221,14 @@ void BackendGLSL::call_layer(int layer, bool unconditional)
 		push_block();
 
 		begin_code(format_var(name));
-		add_code("(sg);\n");
+		add_code("(sg, groupdata);\n");
 		
 		pop_block();
 	}
 	else
 	{
 		begin_code(format_var(name));
-		add_code("(sg);\n");
+		add_code("(sg, groupdata);\n");
 	}
 }
 
@@ -663,7 +663,7 @@ bool BackendGLSL::build_instance(bool groupentry)
 		begin_code("void ");
 	}
 	add_code(unique_layer_name);
-	add_code("(ShaderGlobals & sg)\n");
+	add_code("(ShaderGlobals & sg, GroupData & groupdata)\n");
 	push_block();
 
 	// TODO: Handle "exit" with m_exit_instance_block here...
@@ -797,7 +797,7 @@ void BackendGLSL::build_init()
 
 	begin_code("void ");
 	add_code(unique_name);
-	add_code("(ShaderGlobals & sg)\n");
+	add_code("(ShaderGlobals & sg, GroupData & groupdata)\n");
 	push_block();
 
     // Group init clears all the "layer_run" and "userdata_initialized" flags.
@@ -845,6 +845,9 @@ void BackendGLSL::type_groupdata()
 	// TODO: Now add the array that tells which userdata have been initialized,
     // and the space for the userdata values.
 
+	begin_code("struct GroupData");
+	push_block();
+
 	// For each layer in the group, add entries for all params that are
     // connected or interpolated, and output params.  Also mark those
     // symbols with their offset within the group struct.
@@ -864,6 +867,9 @@ void BackendGLSL::type_groupdata()
 			gen_typespec(dealiased->typespec(), mangled_name);
         }
     }
+
+	pop_block();
+	add_code(";\n");
 }
 
 void BackendGLSL::run()
@@ -909,7 +915,7 @@ void BackendGLSL::run()
     // for the initialization and all public entry points.
 	std::string init_func_name = Strutil::format("group_%d_init", group().id());
 	begin_code(init_func_name);
-	add_code("();\n");
+	add_code("(sg, groupdata);\n");
     for (int layer = 0; layer < nlayers; ++layer) {
 		set_inst (layer);
 		if (m_layer_remap[layer] != -1) {
@@ -918,7 +924,7 @@ void BackendGLSL::run()
 				(group().num_entry_layers() == 0 && 
 				layer == (nlayers - 1))) { // or the last layer as entry
 				begin_code(layer_func_name);
-				add_code("();\n");
+				add_code("(sg, groupdata);\n");
 			}
 		}
     }
