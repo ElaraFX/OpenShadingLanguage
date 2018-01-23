@@ -28,6 +28,20 @@ static ustring op_assign("assign");
 static ustring op_add("add");
 static ustring op_mul("mul");
 
+std::string format_var(const std::string & name)
+{
+	std::string var = name;
+	for (size_t i = 0; i < var.length(); ++i) {
+		if (var[i] == ' ' || 
+			var[i] == '-' || 
+			var[i] == '#' || 
+			var[i] == '$') {
+			var[i] = '_';
+		}
+	}
+	return var;
+}
+
 BackendGLSL::BackendGLSL(
 	ShadingSystemImpl & shadingsys, 
     ShaderGroup & group, 
@@ -79,7 +93,7 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
 {
     if (typespec.is_closure() || typespec.is_closure_array()) {
         begin_code("closure color ");
-		add_code(name);
+		add_code(format_var(name));
         if (typespec.is_unsized_array()) {
             add_code("[]");
 		} else if (typespec.arraylength() > 0) {
@@ -89,7 +103,7 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
     } else if (typespec.structure() > 0) {
 		begin_code(typespec.structspec()->mangled());
 		add_code(" ");
-		add_code(name);
+		add_code(format_var(name));
         if (typespec.is_unsized_array()) {
             add_code("[]");
 		} else if (typespec.arraylength() > 0) {
@@ -99,7 +113,7 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
     } else {
 		begin_code(typespec.simpletype().c_str());
 		add_code(" ");
-		add_code(name);
+		add_code(format_var(name));
         add_code(";\n");
     }
 }
@@ -110,6 +124,14 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 
 	Symbol* dealiased = sym.dealias();
 	std::string mangled_name = dealiased->mangled();
+
+	if (sym.symtype() == SymTypeParam || 
+		sym.symtype() == SymTypeOutputParam)
+	{
+		std::string unique_layer_name = Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id());
+
+		mangled_name = unique_layer_name + "__" + mangled_name;
+	}
 
 	if (dealiased->is_constant() && dealiased->data() != NULL)
 	{
@@ -136,7 +158,7 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 	}
 	else
 	{
-		add_code(mangled_name);
+		add_code(format_var(mangled_name));
 	}
 }
 
@@ -166,7 +188,7 @@ void BackendGLSL::call_layer(int layer, bool unconditional)
     //llvm::Value *layerfield = layer_run_ref(layer_remap(layer));
 	int layerfield = m_layer_remap[layer];
 
-    std::string name = Strutil::format ("%s_%d", parent->layername().c_str(),
+    std::string name = Strutil::format ("%s_%d", parent->shadername().c_str(),
                                         parent->id());
 
 	if (!unconditional)
@@ -176,14 +198,14 @@ void BackendGLSL::call_layer(int layer, bool unconditional)
 		add_code("])\n");
 		push_block();
 
-		begin_code(name);
+		begin_code(format_var(name));
 		add_code("();\n");
 		
 		pop_block();
 	}
 	else
 	{
-		begin_code(name);
+		begin_code(format_var(name));
 		add_code("();\n");
 	}
 }
@@ -333,6 +355,7 @@ bool BackendGLSL::build_op(int opnum)
 	else if (op.opname() == op_end)
 	{
 		// Nothing to do
+		return true;
 	}
 	else if (op.opname() == op_useparam)
 	{
@@ -412,8 +435,8 @@ bool BackendGLSL::build_block(int beginop, int endop)
                    op.opname() == op_end) {
             // Skip this op, it does nothing...
         } else {
-            shadingcontext()->error ("Unsupported op %s in layer %s\n",
-                                     op.opname(), inst()->layername());
+            shadingcontext()->error ("Unsupported op %s in layer %s\n", 
+				op.opname(), inst()->layername().c_str());
             return false;
         }
 
@@ -429,7 +452,7 @@ bool BackendGLSL::build_block(int beginop, int endop)
 
 void BackendGLSL::get_or_allocate_symbol(const Symbol & sym)
 {
-	DASSERT ((sym.symtype() == SymTypeLocal || sym.symtype() == SymTypeTemp ||
+	DASSERT ((sym.symtype() == SymTypeLocal || sym.symtype() == SymTypeTemp || 
               sym.symtype() == SymTypeConst)
              && "get_or_allocate_symbol should only be for local, tmp, const");
 
@@ -458,7 +481,7 @@ void BackendGLSL::assign_zero(const Symbol & sym)
     std::string mangled_name = dealiased->mangled();
     
 	begin_code("memset(");
-	add_code(mangled_name);
+	add_code(format_var(mangled_name));
 	add_code(Strutil::format(", 0, %d, %d);\n", len, (int)align));
 }
 
@@ -476,13 +499,13 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
     // Closures need to get their storage before anything can be
     // assigned to them.  Unless they are params, in which case we took
     // care of it in the group entry point.
-    if (sym.typespec().is_closure_based() &&
+    if (sym.typespec().is_closure_based() && 
         sym.symtype() != SymTypeParam && sym.symtype() != SymTypeOutputParam) {
         assign_zero (sym);
         return;
     }
 
-    if ((sym.symtype() == SymTypeLocal || sym.symtype() == SymTypeTemp) &&
+    if ((sym.symtype() == SymTypeLocal || sym.symtype() == SymTypeTemp) && 
         sym.typespec().is_string_based()) {
         // Strings are pointers.  Can't take any chance on leaving
         // local/tmp syms uninitialized.
@@ -501,17 +524,25 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 			Symbol* dealiased = sym.dealias();
 			std::string mangled_name = dealiased->mangled();
 
+			if (sym.symtype() == SymTypeParam || 
+				sym.symtype() == SymTypeOutputParam)
+			{
+				std::string unique_layer_name = format_var(Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id()));
+
+				mangled_name = unique_layer_name + "__" + mangled_name;
+			}
+
 			TypeSpec elemtype = sym.typespec().elementtype();
 
 			// Fill in the constant val
 			if (!sym.typespec().is_array()) {
-				begin_code(mangled_name);
+				begin_code(format_var(mangled_name));
 				if (elemtype.is_floatbased()) {
 					float float_val = ((float *)sym.data())[0];
 					add_code(Strutil::format(" = %.9f;\n", float_val));
 				} else if (elemtype.is_string()) {
 					ustring string_val = ((ustring *)sym.data())[0];
-					add_code(Strutil::format(" = %s;\n", string_val.c_str()));
+					add_code(Strutil::format(" = %s;\n", Strutil::escape_chars(string_val.c_str())));
 				} else if (elemtype.is_int()) {
 					int int_val = ((int *)sym.data())[0];
 					add_code(Strutil::format(" = %d;\n", int_val));
@@ -519,13 +550,13 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 			} else {
 				int arraylen = sym.typespec().arraylength();
 				for (int a = 0; a < arraylen; ++a) {
-					begin_code(mangled_name);
+					begin_code(format_var(mangled_name));
 					if (elemtype.is_floatbased()) {
 						float float_val = ((float *)sym.data())[0];
 						add_code(Strutil::format("[%d] = %.9f;\n", a, float_val));
 					} else if (elemtype.is_string()) {
 						ustring string_val = ((ustring *)sym.data())[0];
-						add_code(Strutil::format("[%d] = %s;\n", a, string_val.c_str()));
+						add_code(Strutil::format("[%d] = %s;\n", a, Strutil::escape_chars(string_val.c_str())));
 					} else if (elemtype.is_int()) {
 						int int_val = ((int *)sym.data())[0];
 						add_code(Strutil::format("[%d] = %d;\n", a, int_val));
@@ -540,7 +571,7 @@ bool BackendGLSL::build_instance(bool groupentry)
 {
 	// Make a layer function: void layer_func(ShaderGlobals*, GroupData*)
     // Note that the GroupData* is passed as a void*.
-    std::string unique_layer_name = Strutil::format("%s_%d", inst()->layername(), inst()->id());
+    std::string unique_layer_name = format_var(Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id()));
 
 	if (inst()->entry_layer()) {
 		begin_code("__declspec(noinline) void ");
@@ -585,8 +616,8 @@ bool BackendGLSL::build_instance(bool groupentry)
         if (s.typespec().is_structure())
             continue;
 		// Allocate space for locals, temps, aggregate constants
-        if (s.symtype() == SymTypeLocal || s.symtype() == SymTypeTemp ||
-                s.symtype() == SymTypeConst)
+        if (s.symtype() == SymTypeLocal || s.symtype() == SymTypeTemp || 
+            s.symtype() == SymTypeConst)
             get_or_allocate_symbol (s);
         // Set initial value for constants, closures, and strings that are
         // not parameters.
@@ -646,7 +677,7 @@ bool BackendGLSL::build_instance(bool groupentry)
     // inputs.
     for (int layer = this->layer()+1;  layer < group().nlayers();  ++layer) {
         ShaderInstance *child = group()[layer];
-		std::string dst_layer_name = Strutil::format("%s_%d", child->layername(), child->id());
+		std::string dst_layer_name = format_var(Strutil::format("%s_%d", child->shadername().c_str(), child->id()));
         for (int c = 0;  c < child->nconnections();  ++c) {
             const Connection &con (child->connection (c));
             if (con.srclayer == this->layer()) {
@@ -661,9 +692,9 @@ bool BackendGLSL::build_instance(bool groupentry)
 				Symbol* src_dealiased = srcsym->dealias();
 				std::string src_mangled = unique_layer_name + "__" + src_dealiased->mangled();
 
-				begin_code(dst_mangled);
+				begin_code(format_var(dst_mangled));
 				add_code(" = ");
-				add_code(src_mangled);
+				add_code(format_var(src_mangled));
 				add_code(";\n");
             }
         }
@@ -701,20 +732,20 @@ void BackendGLSL::build_init()
         if (gi->unused() || gi->empty_instance())
             continue;
 
-		std::string unique_layer_name = Strutil::format("%s_%d", gi->layername(), gi->id());
+		std::string unique_layer_name = format_var(Strutil::format("%s_%d", gi->shadername().c_str(), gi->id()));
 
         FOREACH_PARAM (Symbol &sym, gi) {
 			if (sym.typespec().is_closure_based()) {
 				Symbol* dealiased = sym.dealias();
-				std::string mangled_name = unique_layer_name + "__" + dealiased->mangled();
+				std::string mangled_name = format_var(unique_layer_name + "__" + dealiased->mangled());
 
 				if (!sym.typespec().is_array()) {
-					begin_code(mangled_name);
+					begin_code(format_var(mangled_name));
 					add_code(" = 0;\n");
 				} else {
 					int arraylen = sym.typespec().arraylength();
 					for (int a = 0; a < arraylen; ++a) {
-						begin_code(mangled_name);
+						begin_code(format_var(mangled_name));
 						add_code(Strutil::format("[%d] = 0;\n", a));
 					}
 				}
@@ -738,15 +769,15 @@ void BackendGLSL::type_groupdata()
         if (inst->unused())
             continue;
 
-		std::string unique_layer_name = Strutil::format ("%s_%d", inst->layername(), inst->id());
+		std::string unique_layer_name = format_var(Strutil::format("%s_%d", inst->shadername().c_str(), inst->id()));
 
         FOREACH_PARAM (Symbol &sym, inst) {
             if (sym.typespec().is_structure())  // skip the struct symbol itself
                 continue;
 
-			Symbol *dealias = sym.dealias();
-			std::string mangled_name = unique_layer_name + "__" + dealias->mangled();
-			gen_typespec(dealias->typespec(), mangled_name);
+			Symbol *dealiased = sym.dealias();
+			std::string mangled_name = unique_layer_name + "__" + dealiased->mangled();
+			gen_typespec(dealiased->typespec(), mangled_name);
         }
     }
 }
@@ -792,13 +823,13 @@ void BackendGLSL::run()
 
 	// Force the JIT to happen now and retrieve the JITed function pointers
     // for the initialization and all public entry points.
-	std::string init_func_name = Strutil::format ("group_%d_init", group().id());
+	std::string init_func_name = Strutil::format("group_%d_init", group().id());
 	begin_code(init_func_name);
 	add_code("();\n");
     for (int layer = 0; layer < nlayers; ++layer) {
 		set_inst (layer);
 		if (m_layer_remap[layer] != -1) {
-			std::string layer_func_name = Strutil::format ("%s_%d", inst()->layername(), inst()->id());
+			std::string layer_func_name = format_var(Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id()));
 			if (group().is_entry_layer(layer) || // User specified entry layer
 				(group().num_entry_layers() == 0 && 
 				layer == (nlayers - 1))) { // or the last layer as entry
