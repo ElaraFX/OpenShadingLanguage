@@ -26,7 +26,9 @@ static ustring op_exit("exit");
 static ustring op_useparam("useparam");
 static ustring op_assign("assign");
 static ustring op_add("add");
+static ustring op_sub("sub");
 static ustring op_mul("mul");
+static ustring op_div("div");
 
 std::string format_var(const std::string & name)
 {
@@ -221,8 +223,8 @@ void BackendGLSL::run_connected_layers(
     bool inmain = (opnum >= inst()->maincodebegin() &&
                    opnum < inst()->maincodeend());
 
-    for (int c = 0;  c < inst()->nconnections();  ++c) {
-        const Connection &con (inst()->connection (c));
+    for (int c = 0; c < inst()->nconnections(); ++c) {
+        const Connection & con(inst()->connection(c));
         // If the connection gives a value to this param
         if (con.dst.param == symindex) {
             // already_run is a set of layers run for this particular op.
@@ -400,6 +402,22 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
+	else if (op.opname() == op_sub)
+	{
+		Symbol& result = *opargsym (op, 0);
+		Symbol& a = *opargsym (op, 1);
+		Symbol& b = *opargsym (op, 2);
+
+		begin_code("");
+		gen_symbol(result);
+		add_code(" = ");
+		gen_symbol(a);
+		add_code(" - ");
+		gen_symbol(b);
+		add_code("\n");
+
+		return true;
+	}
 	else if (op.opname() == op_mul)
 	{
 		Symbol& result = *opargsym (op, 0);
@@ -411,6 +429,22 @@ bool BackendGLSL::build_op(int opnum)
 		add_code(" = ");
 		gen_symbol(a);
 		add_code(" * ");
+		gen_symbol(b);
+		add_code("\n");
+
+		return true;
+	}
+	else if (op.opname() == op_div)
+	{
+		Symbol& result = *opargsym (op, 0);
+		Symbol& a = *opargsym (op, 1);
+		Symbol& b = *opargsym (op, 2);
+
+		begin_code("");
+		gen_symbol(result);
+		add_code(" = ");
+		gen_symbol(a);
+		add_code(" / ");
 		gen_symbol(b);
 		add_code("\n");
 
@@ -468,21 +502,19 @@ void BackendGLSL::get_or_allocate_symbol(const Symbol & sym)
 
 void BackendGLSL::assign_zero(const Symbol & sym)
 {
-    int len;
-    if (sym.typespec().is_closure_based())
-        len = sizeof(void *) * sym.typespec().numelements();
-    else
-        len = sym.derivsize();
-    // N.B. derivsize() includes derivs, if there are any
-    size_t align = sym.typespec().is_closure_based() ? sizeof(void*) :
-                         sym.typespec().simpletype().basesize();
-    
 	Symbol* dealiased = sym.dealias();
-    std::string mangled_name = dealiased->mangled();
-    
-	begin_code("memset(");
-	add_code(format_var(mangled_name));
-	add_code(Strutil::format(", 0, %d, %d);\n", len, (int)align));
+    std::string mangled_name = format_var(dealiased->mangled());
+
+	if (!sym.typespec().is_array()) {
+		begin_code(mangled_name);
+		add_code(" = 0;\n");
+	} else {
+		int arraylen = sym.typespec().arraylength();
+		for (int a = 0; a < arraylen; ++a) {
+			begin_code(mangled_name);
+			add_code(Strutil::format("[%d] = 0;\n", a));
+		}
+	}
 }
 
 void BackendGLSL::assign_initial_value(const Symbol & sym)
@@ -678,8 +710,8 @@ bool BackendGLSL::build_instance(bool groupentry)
     for (int layer = this->layer()+1;  layer < group().nlayers();  ++layer) {
         ShaderInstance *child = group()[layer];
 		std::string dst_layer_name = format_var(Strutil::format("%s_%d", child->shadername().c_str(), child->id()));
-        for (int c = 0;  c < child->nconnections();  ++c) {
-            const Connection &con (child->connection (c));
+        for (int c = 0; c < child->nconnections(); ++c) {
+            const Connection & con(child->connection(c));
             if (con.srclayer == this->layer()) {
                 Symbol *srcsym (inst()->symbol (con.src.param));
                 Symbol *dstsym (child->symbol (con.dst.param));
@@ -727,7 +759,7 @@ void BackendGLSL::build_init()
 
     // Group init also needs to allot space for ALL layers' params
     // that are closures (to avoid weird order of layer eval problems).
-    for (int i = 0;  i < group().nlayers();  ++i) {
+    for (int i = 0;  i < group().nlayers(); ++i) {
         ShaderInstance *gi = group()[i];
         if (gi->unused() || gi->empty_instance())
             continue;
@@ -740,12 +772,12 @@ void BackendGLSL::build_init()
 				std::string mangled_name = format_var(unique_layer_name + "__" + dealiased->mangled());
 
 				if (!sym.typespec().is_array()) {
-					begin_code(format_var(mangled_name));
+					begin_code(mangled_name);
 					add_code(" = 0;\n");
 				} else {
 					int arraylen = sym.typespec().arraylength();
 					for (int a = 0; a < arraylen; ++a) {
-						begin_code(format_var(mangled_name));
+						begin_code(mangled_name);
 						add_code(Strutil::format("[%d] = 0;\n", a));
 					}
 				}
