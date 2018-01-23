@@ -75,6 +75,35 @@ void BackendGLSL::pop_block()
 	begin_code("}\n");
 }
 
+void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & name)
+{
+    if (typespec.is_closure() || typespec.is_closure_array()) {
+        begin_code("closure color ");
+		add_code(name);
+        if (typespec.is_unsized_array()) {
+            add_code("[]");
+		} else if (typespec.arraylength() > 0) {
+            add_code(Strutil::format("[%d]", typespec.arraylength()));
+		}
+		add_code(";\n");
+    } else if (typespec.structure() > 0) {
+		begin_code(typespec.structspec()->mangled());
+		add_code(" ");
+		add_code(name);
+        if (typespec.is_unsized_array()) {
+            add_code("[]");
+		} else if (typespec.arraylength() > 0) {
+            add_code(Strutil::format("[%d]", typespec.arraylength()));
+		}
+		add_code(";\n");
+    } else {
+		begin_code(typespec.simpletype().c_str());
+		add_code(" ");
+		add_code(name);
+        add_code(";\n");
+    }
+}
+
 void BackendGLSL::gen_symbol(Symbol & sym)
 {
 	add_code(" ");
@@ -408,9 +437,7 @@ void BackendGLSL::get_or_allocate_symbol(const Symbol & sym)
     std::set<std::string>::iterator iter = m_named_values.find(mangled_name);
 
     if (iter == m_named_values.end()) {
-		begin_code("allocate ");
-		add_code(mangled_name);
-		add_code("\n");
+		gen_typespec(dealiased->typespec(), mangled_name);
         m_named_values.insert(mangled_name);
     }
 }
@@ -717,18 +744,7 @@ void BackendGLSL::type_groupdata()
 
 			Symbol *dealias = sym.dealias();
 			std::string mangled_name = dealias->mangled();
-
-			if (!sym.typespec().is_array()) {
-				begin_code("declare ");
-				add_code(mangled_name);
-				add_code(";\n");
-			} else {
-				int arraylen = sym.typespec().arraylength();
-
-				begin_code("declare ");
-				add_code(mangled_name);
-				add_code(Strutil::format("[%d];\n", arraylen));
-			}
+			gen_typespec(dealias->typespec(), mangled_name);
         }
     }
 }

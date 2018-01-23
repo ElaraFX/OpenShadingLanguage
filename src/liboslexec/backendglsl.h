@@ -33,6 +33,7 @@ private:
 	void add_code(const std::string & code);
 	void push_block();
 	void pop_block();
+	void gen_typespec(const TypeSpec & typespec, const std::string & name);
 	void gen_symbol(Symbol & sym);
 	bool gen_code(const Opcode & op);
 	void call_layer(int layer, bool unconditional);
