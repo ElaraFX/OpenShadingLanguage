@@ -96,7 +96,7 @@ void BackendGLSL::pop_block()
 void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & name)
 {
     if (typespec.is_closure() || typespec.is_closure_array()) {
-        begin_code("closure color ");
+        begin_code("closure_color ");
 		add_code(format_var(name));
         if (typespec.is_unsized_array()) {
             add_code("[]");
@@ -192,7 +192,7 @@ bool BackendGLSL::gen_code(const Opcode & op)
 		Symbol & sym = *opargsym(op, i);
 		gen_symbol(sym);
 	}
-	add_code(");\n");
+	add_code(")");
 	return true;
 }
 
@@ -504,7 +504,10 @@ bool BackendGLSL::build_op(int opnum)
 	}
 	else
 	{
-		return gen_code(op);
+		gen_code(op);
+		add_code(";\n");
+
+		return true;
 	}
 }
 
@@ -845,7 +848,7 @@ void BackendGLSL::type_groupdata()
 	// TODO: Now add the array that tells which userdata have been initialized,
     // and the space for the userdata values.
 
-	begin_code("struct GroupData");
+	begin_code("struct GroupData\n");
 	push_block();
 
 	// For each layer in the group, add entries for all params that are
