@@ -122,8 +122,6 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
 
 void BackendGLSL::gen_symbol(Symbol & sym)
 {
-	add_code(" ");
-
 	Symbol* dealiased = sym.dealias();
 	std::string mangled_name = dealiased->mangled();
 
@@ -138,24 +136,41 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 	if (dealiased->is_constant() && dealiased->data() != NULL)
 	{
 		TypeDesc t = dealiased->typespec().simpletype();
-		int n = int(t.aggregate * t.numelements());
-		if (t.basetype == TypeDesc::FLOAT) {
-			for (int j = 0; j < n; ++j) {
-				add_code(j ? " " : "");
-				add_code(Strutil::format("%.9f", ((float *)dealiased->data())[j]));
+		if (t.is_array()) {
+			add_code("{");
+		}
+		for (int a = 0; a < t.numelements(); ++a) {
+			if (t.is_array()) {
+				add_code((a != 0) ? ", " : "");
 			}
-		} else if (t.basetype == TypeDesc::INT) {
-			for (int j = 0; j < n; ++j) {
-				add_code(j ? " " : "");
-				add_code(Strutil::format("%d", ((int *)dealiased->data())[j]));
+			if (t.aggregate != 1) {
+				add_code(t.c_str());
+				add_code("(");
 			}
-		} else if (t.basetype == TypeDesc::STRING) {
-			for (int j = 0; j < n; ++j) {
-				add_code(j ? " " : "");
-				add_code("\"");
-				add_code(Strutil::escape_chars(((ustring *)dealiased->data())[j].string()));
-				add_code("\"");
+			if (t.basetype == TypeDesc::FLOAT) {
+				for (int j = 0; j < t.aggregate; ++j) {
+					add_code((j != 0) ? ", " : "");
+					add_code(Strutil::format("%.9f", ((float *)dealiased->data())[j]));
+				}
+			} else if (t.basetype == TypeDesc::INT) {
+				for (int j = 0; j < t.aggregate; ++j) {
+					add_code((j != 0) ? ", " : "");
+					add_code(Strutil::format("%d", ((int *)dealiased->data())[j]));
+				}
+			} else if (t.basetype == TypeDesc::STRING) {
+				for (int j = 0; j < t.aggregate; ++j) {
+					add_code((j != 0) ? ", " : "");
+					add_code("\"");
+					add_code(Strutil::escape_chars(((ustring *)dealiased->data())[j].string()));
+					add_code("\"");
+				}
 			}
+			if (t.aggregate != 1) {
+				add_code(")");
+			}
+		}
+		if (t.is_array()) {
+			add_code("}");
 		}
 	}
 	else
@@ -167,12 +182,15 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 bool BackendGLSL::gen_code(const Opcode & op)
 {
 	begin_code(op.opname().string());
+	add_code("(");
 	for (int i = 0; i < op.nargs(); ++i)
 	{
+		add_code((i != 0) ? ", " : "");
+
 		Symbol & sym = *opargsym(op, i);
 		gen_symbol(sym);
 	}
-	add_code("\n");
+	add_code(");\n");
 	return true;
 }
 
