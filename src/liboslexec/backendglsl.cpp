@@ -992,9 +992,11 @@ void BackendGLSL::build_init()
 	push_block();
 
     // Group init clears all the "layer_run" and "userdata_initialized" flags.
-    if (m_num_used_layers > 1) {
-        // TODO: Clear m_num_used_layers entries...
-    }
+	for (int i = 0; i < m_num_used_layers; ++i)
+	{
+		begin_code(Strutil::format("run[%d] = false;\n", i));
+	}
+
     int num_userdata = (int) group().m_userdata_names.size();
     if (num_userdata) {
         // TODO: Clear num_userdata entries...
@@ -1059,15 +1061,19 @@ void BackendGLSL::type_groupdata()
         }
     }
 
-	pop_block();
-	add_code(";\n");
+	// Specialized pop_block for structure definition
+	-- m_block_level;
+	begin_code("};\n");
+
+	begin_code(Strutil::format("bool run[%d];\n", m_num_used_layers));
 }
 
 void BackendGLSL::run()
 {
 	reset_code();
 
-	// TODO: Include all built-in ops here...
+	// Include all built-in ops here
+	begin_code("#include <stdosl_glsl.h>\n");
 
 	// Set up m_num_used_layers to be the number of layers that are
     // actually used, and m_layer_remap[] to map original layer numbers
