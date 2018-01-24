@@ -294,7 +294,7 @@ void BackendGLSL::call_layer(int layer, bool unconditional)
 
 	if (!unconditional)
 	{
-		begin_code("if (!run[");
+		begin_code("if (!groupdata.run[");
 		add_code(Strutil::format("%d", layerfield));
 		add_code("])\n");
 		push_block();
@@ -869,7 +869,7 @@ bool BackendGLSL::build_instance(bool groupentry)
         // For entry layers, we need an extra check to see if it already
         // ran. If it has, do an early return. Otherwise, set the 'ran' flag
         // and then run the layer.
-		begin_code("if (run[");
+		begin_code("if (groupdata.run[");
 		add_code(Strutil::format("%d", layerfield));
 		add_code("])\n");
 
@@ -878,7 +878,7 @@ bool BackendGLSL::build_instance(bool groupentry)
 		pop_block();
     }
     // Mark this layer as executed
-	begin_code("run[");
+	begin_code("groupdata.run[");
 	add_code(Strutil::format("%d", layerfield));
 	add_code("] = true;\n");
 
@@ -994,7 +994,7 @@ void BackendGLSL::build_init()
     // Group init clears all the "layer_run" and "userdata_initialized" flags.
 	for (int i = 0; i < m_num_used_layers; ++i)
 	{
-		begin_code(Strutil::format("run[%d] = false;\n", i));
+		begin_code(Strutil::format("groupdata.run[%d] = false;\n", i));
 	}
 
     int num_userdata = (int) group().m_userdata_names.size();
@@ -1061,11 +1061,11 @@ void BackendGLSL::type_groupdata()
         }
     }
 
+	begin_code(Strutil::format("bool run[%d];\n", m_num_used_layers));
+
 	// Specialized pop_block for structure definition
 	-- m_block_level;
 	begin_code("};\n");
-
-	begin_code(Strutil::format("bool run[%d];\n", m_num_used_layers));
 }
 
 void BackendGLSL::run()
