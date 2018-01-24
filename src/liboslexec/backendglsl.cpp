@@ -64,7 +64,9 @@ std::string format_var(const std::string & name)
 
 std::string format_float(const std::string & val)
 {
-	std::string str = val;
+	std::vector<char> buf(val.length() + 1);
+	char *str = &buf[0];
+	memcpy(str, val.data(), buf.size());
 
 	int len = 0;
 	int point = -1;
@@ -98,7 +100,7 @@ std::string format_float(const std::string & val)
 		}
 	}
 
-	return str;
+	return std::string(str);
 }
 
 BackendGLSL::BackendGLSL(
@@ -820,7 +822,8 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 				begin_code(format_var(mangled_name));
 				if (elemtype.is_floatbased()) {
 					float float_val = ((float *)sym.data())[0];
-					add_code(format_float(Strutil::format(" = %.9f;\n", float_val)));
+					add_code(format_float(Strutil::format(" = %.9f", float_val)));
+					add_code(";\n");
 				} else if (elemtype.is_string()) {
 					ustring string_val = ((ustring *)sym.data())[0];
 					add_code(Strutil::format(" = %s;\n", Strutil::escape_chars(string_val.c_str())));
@@ -834,7 +837,9 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 					begin_code(format_var(mangled_name));
 					if (elemtype.is_floatbased()) {
 						float float_val = ((float *)sym.data())[0];
-						add_code(format_float(Strutil::format("[%d] = %.9f;\n", a, float_val)));
+						add_code(Strutil::format("[%d] = ", a));
+						add_code(format_float(Strutil::format("%.9f", float_val)));
+						add_code(";\n");
 					} else if (elemtype.is_string()) {
 						ustring string_val = ((ustring *)sym.data())[0];
 						add_code(Strutil::format("[%d] = %s;\n", a, Strutil::escape_chars(string_val.c_str())));
