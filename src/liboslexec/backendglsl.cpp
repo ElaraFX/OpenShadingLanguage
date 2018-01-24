@@ -31,6 +31,22 @@ static ustring op_mul("mul");
 static ustring op_div("div");
 static ustring op_compref("compref");
 static ustring op_compassign("compassign");
+static ustring op_raytype("raytype");
+static ustring op_eq("eq");
+static ustring op_neq("neq");
+static ustring op_lt("lt");
+static ustring op_le("le");
+static ustring op_gt("gt");
+static ustring op_ge("ge");
+static ustring op_floor("floor");
+static ustring op_ceil("ceil");
+static ustring op_trunc("trunc");
+static ustring op_round("round");
+static ustring op_Dx("Dx");
+static ustring op_Dy("Dy");
+static ustring op_min("min");
+static ustring op_max("max");
+static ustring op_pow("pow");
 
 std::string format_var(const std::string & name)
 {
@@ -44,6 +60,45 @@ std::string format_var(const std::string & name)
 		}
 	}
 	return var;
+}
+
+std::string format_float(const std::string & val)
+{
+	std::string str = val;
+
+	int len = 0;
+	int point = -1;
+
+	for (int i = 0; ; ++i)
+	{
+		if (str[i] == '\0')
+		{
+			len = i;
+			break;
+		}
+
+		if (str[i] == '.')
+		{
+			point = i;
+		}
+	}
+
+	if (point != -1)
+	{
+		for (int i = len - 1; i > point + 1; --i)
+		{
+			if (str[i] == '0')
+			{
+				str[i] = '\0';
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+
+	return str;
 }
 
 BackendGLSL::BackendGLSL(
@@ -62,6 +117,8 @@ void BackendGLSL::reset_code()
 {
 	m_code.clear();
 	m_block_level = 0;
+	m_function_id = 0;
+	m_function_stack.clear();
 }
 
 void BackendGLSL::begin_code(const std::string & code)
@@ -91,6 +148,28 @@ void BackendGLSL::pop_block()
 	-- m_block_level;
 
 	begin_code("}\n");
+}
+
+void BackendGLSL::push_function(Symbol & function_name)
+{
+	begin_code(Strutil::format("// FUNCTIONCALL_%d ", m_function_id));
+	gen_symbol(function_name);
+	add_code("\n");
+
+	m_function_stack.push_back(m_function_id);
+	++ m_function_id;
+
+	push_block();
+}
+
+void BackendGLSL::pop_function()
+{
+	pop_block();
+
+	int last_function_id = m_function_stack.back();
+	m_function_stack.pop_back();
+
+	begin_code(Strutil::format("FUNCTIONCALL_%d_AFTER_BLOCK:\n", last_function_id));
 }
 
 void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & name)
@@ -152,7 +231,7 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 			if (t.basetype == TypeDesc::FLOAT) {
 				for (int j = 0; j < t.aggregate; ++j) {
 					add_code((j != 0) ? ", " : "");
-					add_code(Strutil::format("%.9f", ((float *)dealiased->data())[j]));
+					add_code(format_float(Strutil::format("%.9f", ((float *)dealiased->data())[j])));
 				}
 			} else if (t.basetype == TypeDesc::INT) {
 				for (int j = 0; j < t.aggregate; ++j) {
@@ -288,9 +367,10 @@ bool BackendGLSL::build_op(int opnum)
 
 	if (op.opname() == op_if)
 	{
-		Symbol& cond = *(inst()->argsymbol(op.firstarg()));
+		Symbol & cond = *opargsym(op, 0);
 
 		gen_code(op);
+		add_code("\n");
 
 		push_block();
 
@@ -314,20 +394,23 @@ bool BackendGLSL::build_op(int opnum)
 	}
 	else if (op.opname() == op_functioncall)
 	{
-		gen_code(op);
+		Symbol & function_name = *opargsym(op, 0);
 
-		push_block();
+		push_function(function_name);
 
 		build_block (opnum + 1, op.jump(0));
 
-		pop_block();
+		pop_function();
 
 		return true;
 	}
-	else if (op.opname() == op_dowhile || op.opname() == op_for || op.opname() == op_while)
+	else if (
+		op.opname() == op_dowhile || 
+		op.opname() == op_for || 
+		op.opname() == op_while)
 	{
 		// Branch on the condition, to our blocks
-		Symbol& cond = *(inst()->argsymbol(op.firstarg()));
+		Symbol & cond = *opargsym(op, 0);
 
 		// Initialization (will be empty except for "for" loops)
 		build_block (opnum + 1, op.jump(0));
@@ -351,7 +434,9 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
-	else if (op.opname() == op_break || op.opname() == op_continue)
+	else if (
+		op.opname() == op_break || 
+		op.opname() == op_continue)
 	{
 		if (op.opname() == op_break) {
 			//rop.ll.op_branch (rop.ll.loop_after_block());
@@ -361,15 +446,23 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
-	else if (op.opname() == op_return || op.opname() == op_exit)
+	else if (
+		op.opname() == op_return || 
+		op.opname() == op_exit)
 	{
 		if (op.opname() == op_exit) {
-			// If it's a real "exit", totally jump out of the shader instance.
-			// The exit instance block will be created if it doesn't yet exist.
-			//rop.ll.op_branch (rop.llvm_exit_instance_block());
+			// If it's a real "exit", totally jump out of the shader instance. 
+			// Since we compile shader instance into a function, a return will 
+			// just do the trick.
+			begin_code("return;\n");
 		} else {
 			// If it's a "return", jump to the exit point of the function.
-			//rop.ll.op_branch (rop.ll.return_block());
+			if (m_function_stack.empty()) {
+				begin_code("return;\n");
+			} else {
+				int current_function_id = m_function_stack.back();
+				begin_code(Strutil::format("goto FUNCTIONCALL_%d_AFTER_BLOCK;\n", current_function_id));
+			}
 		}
 
 		return true;
@@ -386,7 +479,7 @@ bool BackendGLSL::build_op(int opnum)
 		std::set<int> already_run;
 
 		for (int i = 0;  i < op.nargs();  ++i) {
-			Symbol& sym = *opargsym (op, i);
+			Symbol & sym = *opargsym (op, i);
 			int symindex = inst()->arg (op.firstarg()+i);
 			run_connected_layers (sym, symindex, opnum, &already_run);
 		}
@@ -406,7 +499,11 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
-	else if (op.opname() == op_add)
+	else if (
+		op.opname() == op_add || 
+		op.opname() == op_sub || 
+		op.opname() == op_mul || 
+		op.opname() == op_div)
 	{
 		Symbol& result = *opargsym (op, 0);
 		Symbol& a = *opargsym (op, 1);
@@ -416,55 +513,17 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(result);
 		add_code(" = ");
 		gen_symbol(a);
-		add_code(" + ");
-		gen_symbol(b);
-		add_code(";\n");
 
-		return true;
-	}
-	else if (op.opname() == op_sub)
-	{
-		Symbol& result = *opargsym (op, 0);
-		Symbol& a = *opargsym (op, 1);
-		Symbol& b = *opargsym (op, 2);
+		if (op.opname() == op_add) {
+			add_code(" + ");
+		} else if (op.opname() == op_sub) {
+			add_code(" - ");
+		} else if (op.opname() == op_mul) {
+			add_code(" * ");
+		} else {
+			add_code(" / ");
+		}
 
-		begin_code("");
-		gen_symbol(result);
-		add_code(" = ");
-		gen_symbol(a);
-		add_code(" - ");
-		gen_symbol(b);
-		add_code(";\n");
-
-		return true;
-	}
-	else if (op.opname() == op_mul)
-	{
-		Symbol& result = *opargsym (op, 0);
-		Symbol& a = *opargsym (op, 1);
-		Symbol& b = *opargsym (op, 2);
-
-		begin_code("");
-		gen_symbol(result);
-		add_code(" = ");
-		gen_symbol(a);
-		add_code(" * ");
-		gen_symbol(b);
-		add_code(";\n");
-
-		return true;
-	}
-	else if (op.opname() == op_div)
-	{
-		Symbol& result = *opargsym (op, 0);
-		Symbol& a = *opargsym (op, 1);
-		Symbol& b = *opargsym (op, 2);
-
-		begin_code("");
-		gen_symbol(result);
-		add_code(" = ");
-		gen_symbol(a);
-		add_code(" / ");
 		gen_symbol(b);
 		add_code(";\n");
 
@@ -499,6 +558,141 @@ bool BackendGLSL::build_op(int opnum)
 		add_code("] = ");
 		gen_symbol(Val);
 		add_code(";\n");
+
+		return true;
+	}
+	else if (op.opname() == op_raytype)
+	{
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& Name = *opargsym (op, 1);
+
+		if (Name.is_constant()) {
+			// We can statically determine the bit pattern
+			ustring name = ((ustring *)Name.data())[0];
+			int raytype_bit = shadingsys().raytype_bit(name);
+
+			begin_code("");
+			gen_symbol(Result);
+			add_code(Strutil::format(" = raytype_bit(%d);\n", raytype_bit));
+		} else {
+			// No way to know which name is being asked for
+			begin_code("");
+			gen_symbol(Result);
+			add_code(" = raytype_name(");
+			gen_symbol(Name);
+			add_code(");\n");
+		}
+
+		return true;
+	}
+	else if (
+		op.opname() == op_eq || 
+		op.opname() == op_neq || 
+		op.opname() == op_lt || 
+		op.opname() == op_le || 
+		op.opname() == op_gt || 
+		op.opname() == op_ge)
+	{
+		Symbol &Result = *opargsym (op, 0);
+		Symbol &A = *opargsym (op, 1);
+		Symbol &B = *opargsym (op, 2);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = (");
+		gen_symbol(A);
+
+		if (op.opname() == op_eq) {
+			add_code(" == ");
+		} else if (op.opname() == op_neq) {
+			add_code(" != ");
+		} else if (op.opname() == op_lt) {
+			add_code(" < ");
+		} else if (op.opname() == op_le) {
+			add_code(" <= ");
+		} else if (op.opname() == op_gt) {
+			add_code(" > ");
+		} else {
+			add_code(" >= ");
+		}
+
+		gen_symbol(B);
+		add_code(");\n");
+
+		return true;
+	}
+	else if (
+		op.opname() == op_floor || 
+		op.opname() == op_ceil || 
+		op.opname() == op_trunc || 
+		op.opname() == op_round)
+	{
+		Symbol & result = *opargsym(op, 0);
+		Symbol & src = *opargsym(op, 1);
+
+		begin_code("");
+		gen_symbol(result);
+
+		if (op.opname() == op_floor) {
+			add_code(" = floor(");
+		} else if (op.opname() == op_ceil) {
+			add_code(" = ceil(");
+		} else if (op.opname() == op_trunc) {
+			add_code(" = trunc(");
+		} else {
+			add_code(" = round(");
+		}
+
+		gen_symbol(src);
+		add_code(");\n");
+
+		return true;
+	}
+	else if (
+		op.opname() == op_Dx || 
+		op.opname() == op_Dy)
+	{
+		Symbol & result = *opargsym(op, 0);
+		Symbol & src = *opargsym(op, 1);
+
+		begin_code("");
+		gen_symbol(result);
+
+		if (op.opname() == op_Dx) {
+			add_code(" = Dx(");
+		} else {
+			add_code(" = Dy(");
+		}
+
+		gen_symbol(src);
+		add_code(");\n");
+
+		return true;
+	}
+	else if (
+		op.opname() == op_min || 
+		op.opname() == op_max || 
+		op.opname() == op_pow)
+	{
+		Symbol& result = *opargsym (op, 0);
+		Symbol& a = *opargsym (op, 1);
+		Symbol& b = *opargsym (op, 2);
+
+		begin_code("");
+		gen_symbol(result);
+
+		if (op.opname() == op_min) {
+			add_code(" = min(");
+		} else if (op.opname() == op_max) {
+			add_code(" = max(");
+		} else {
+			add_code(" = pow(");
+		}
+
+		gen_symbol(a);
+		add_code(", ");
+		gen_symbol(b);
+		add_code(");\n");
 
 		return true;
 	}
@@ -626,7 +820,7 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 				begin_code(format_var(mangled_name));
 				if (elemtype.is_floatbased()) {
 					float float_val = ((float *)sym.data())[0];
-					add_code(Strutil::format(" = %.9f;\n", float_val));
+					add_code(format_float(Strutil::format(" = %.9f;\n", float_val)));
 				} else if (elemtype.is_string()) {
 					ustring string_val = ((ustring *)sym.data())[0];
 					add_code(Strutil::format(" = %s;\n", Strutil::escape_chars(string_val.c_str())));
@@ -640,7 +834,7 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 					begin_code(format_var(mangled_name));
 					if (elemtype.is_floatbased()) {
 						float float_val = ((float *)sym.data())[0];
-						add_code(Strutil::format("[%d] = %.9f;\n", a, float_val));
+						add_code(format_float(Strutil::format("[%d] = %.9f;\n", a, float_val)));
 					} else if (elemtype.is_string()) {
 						ustring string_val = ((ustring *)sym.data())[0];
 						add_code(Strutil::format("[%d] = %s;\n", a, Strutil::escape_chars(string_val.c_str())));
@@ -668,8 +862,6 @@ bool BackendGLSL::build_instance(bool groupentry)
 	add_code(unique_layer_name);
 	add_code("(ShaderGlobals & sg, GroupData & groupdata)\n");
 	push_block();
-
-	// TODO: Handle "exit" with m_exit_instance_block here...
 
 	//llvm::Value *layerfield = layer_run_ref(m_layer_remap[layer()]);
 	int layerfield = m_layer_remap[layer()];
@@ -755,10 +947,6 @@ bool BackendGLSL::build_instance(bool groupentry)
 	build_block(
 		inst()->maincodebegin(), 
 		inst()->maincodeend());
-
-	// TODO: Handle exit point here...
-	//if (llvm_has_exit_instance_block())
-        //ll.op_branch (m_exit_instance_block); // also sets insert point
 
 	// Transfer all of this layer's outputs into the downstream shader's
     // inputs.

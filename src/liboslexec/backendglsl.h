@@ -33,6 +33,8 @@ private:
 	void add_code(const std::string & code);
 	void push_block();
 	void pop_block();
+	void push_function(Symbol & function_name);
+	void pop_function();
 	void gen_typespec(const TypeSpec & typespec, const std::string & name);
 	void gen_symbol(Symbol & sym);
 	bool gen_code(const Opcode & op);
@@ -56,6 +58,9 @@ private:
 	std::set<int> m_layers_already_run; ///< List of layers run
     int m_num_used_layers;              ///< Number of layers actually used
 	int m_block_level;
+
+	int m_function_id;					///< Line counter for function call
+	std::vector<int> m_function_stack;	///< Stack of function calls
 };
 
 
