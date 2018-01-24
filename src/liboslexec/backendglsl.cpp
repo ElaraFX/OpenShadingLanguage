@@ -419,20 +419,51 @@ bool BackendGLSL::build_op(int opnum)
 
 		// For "do-while", we go straight to the body of the loop, but for
 		// "for" or "while", we test the condition next.
-		//rop.ll.op_branch (op.opname() == op_dowhile ? body_block : cond_block);
+		if (op.opname() == op_dowhile)
+		{
+			begin_code("do\n");
 
-		// Load the condition variable and figure out if it's nonzero
-		build_block (op.jump(0), op.jump(1)/*, cond_block*/);
-		//llvm::Value* cond_val = rop.llvm_test_nonzero (cond);
+			push_block();
 
-		// Jump to either LoopBody or AfterLoop
-		//rop.ll.op_branch (cond_val, body_block, after_block);
+			// Loop body
+			build_block (op.jump(1), op.jump(2));
 
-		// Body of loop
-		build_block (op.jump(1), op.jump(2)/*, body_block*/);
+			// Step block
+			build_block (op.jump(2), op.jump(3));
 
-		// Step
-		build_block (op.jump(2), op.jump(3)/*, step_block*/);
+			// Condition block
+			build_block (op.jump(0), op.jump(1));
+
+			pop_block();
+
+			// Test condition
+			begin_code("while (");
+			gen_symbol(cond);
+			add_code(");\n");
+		}
+		else
+		{
+			// Condition block
+			build_block (op.jump(0), op.jump(1));
+
+			// Test condition
+			begin_code("while (");
+			gen_symbol(cond);
+			add_code(")\n");
+
+			push_block();
+
+			// Loop body
+			build_block (op.jump(1), op.jump(2));
+
+			// Step block
+			build_block (op.jump(2), op.jump(3));
+
+			// Condition block
+			build_block (op.jump(0), op.jump(1));
+
+			pop_block();
+		}
 
 		return true;
 	}
@@ -441,9 +472,9 @@ bool BackendGLSL::build_op(int opnum)
 		op.opname() == op_continue)
 	{
 		if (op.opname() == op_break) {
-			//rop.ll.op_branch (rop.ll.loop_after_block());
-		} else {  // continue
-			//rop.ll.op_branch (rop.ll.loop_step_block());
+			begin_code("break;\n");
+		} else {
+			begin_code("continue;\n");
 		}
 
 		return true;
@@ -860,7 +891,7 @@ bool BackendGLSL::build_instance(bool groupentry)
     std::string unique_layer_name = format_var(Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id()));
 
 	if (inst()->entry_layer()) {
-		begin_code("__declspec(noinline) void ");
+		begin_code("ENTRY_API void ");
 	} else {
 		begin_code("void ");
 	}
