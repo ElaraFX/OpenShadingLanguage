@@ -213,7 +213,11 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 	{
 		std::string unique_layer_name = Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id());
 
-		mangled_name = unique_layer_name + "__" + mangled_name;
+		mangled_name = "groupdata." + unique_layer_name + "__" + mangled_name;
+	}
+	else if (sym.symtype() == SymTypeGlobal)
+	{
+		mangled_name = "sg." + mangled_name;
 	}
 
 	if (dealiased->is_constant() && dealiased->data() != NULL)
@@ -787,6 +791,11 @@ void BackendGLSL::assign_zero(const Symbol & sym)
 	Symbol* dealiased = sym.dealias();
     std::string mangled_name = format_var(dealiased->mangled());
 
+	if (sym.symtype() == SymTypeGlobal)
+	{
+		mangled_name = "sg." + mangled_name;
+	}
+
 	if (!sym.typespec().is_array()) {
 		begin_code(mangled_name);
 		add_code(" = 0;\n");
@@ -843,7 +852,11 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 			{
 				std::string unique_layer_name = format_var(Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id()));
 
-				mangled_name = unique_layer_name + "__" + mangled_name;
+				mangled_name = "groupdata." + unique_layer_name + "__" + mangled_name;
+			}
+			else if (sym.symtype() == SymTypeGlobal)
+			{
+				mangled_name = "sg." + mangled_name;
 			}
 
 			TypeSpec elemtype = sym.typespec().elementtype();
@@ -998,10 +1011,10 @@ bool BackendGLSL::build_instance(bool groupentry)
                 // FIXME -- I'm not sure I understand this.  Isn't this
                 // unnecessary if we wrote to the parameter ourself?
 				Symbol* dst_dealiased = dstsym->dealias();
-				std::string dst_mangled = dst_layer_name + "__" + dst_dealiased->mangled();
+				std::string dst_mangled = "groupdata." + dst_layer_name + "__" + dst_dealiased->mangled();
 
 				Symbol* src_dealiased = srcsym->dealias();
-				std::string src_mangled = unique_layer_name + "__" + src_dealiased->mangled();
+				std::string src_mangled = "groupdata." + unique_layer_name + "__" + src_dealiased->mangled();
 
 				begin_code(format_var(dst_mangled));
 				add_code(" = ");
@@ -1050,7 +1063,7 @@ void BackendGLSL::build_init()
         FOREACH_PARAM (Symbol &sym, gi) {
 			if (sym.typespec().is_closure_based()) {
 				Symbol* dealiased = sym.dealias();
-				std::string mangled_name = format_var(unique_layer_name + "__" + dealiased->mangled());
+				std::string mangled_name = format_var("groupdata." + unique_layer_name + "__" + dealiased->mangled());
 
 				if (!sym.typespec().is_array()) {
 					begin_code(mangled_name);
@@ -1092,7 +1105,10 @@ void BackendGLSL::type_groupdata()
                 continue;
 
 			Symbol *dealiased = sym.dealias();
+			
+			// Don't need "groupdata." prefix inside struct definition
 			std::string mangled_name = unique_layer_name + "__" + dealiased->mangled();
+			
 			gen_typespec(dealiased->typespec(), mangled_name);
         }
     }
