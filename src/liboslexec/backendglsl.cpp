@@ -269,7 +269,7 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 bool BackendGLSL::gen_code(const Opcode & op)
 {
 	begin_code(op.opname().string());
-	add_code(" (");
+	add_code(" (sg, ");
 	for (int i = 0; i < op.nargs(); ++i)
 	{
 		add_code((i != 0) ? ", " : "");
@@ -375,8 +375,9 @@ bool BackendGLSL::build_op(int opnum)
 	{
 		Symbol & cond = *opargsym(op, 0);
 
-		gen_code(op);
-		add_code("\n");
+		begin_code("if (");
+		gen_symbol(cond);
+		add_code(")\n");
 
 		push_block();
 
@@ -610,12 +611,12 @@ bool BackendGLSL::build_op(int opnum)
 
 			begin_code("");
 			gen_symbol(Result);
-			add_code(Strutil::format(" = raytype_bit(%d);\n", raytype_bit));
+			add_code(Strutil::format(" = raytype_bit(sg, %d);\n", raytype_bit));
 		} else {
 			// No way to know which name is being asked for
 			begin_code("");
 			gen_symbol(Result);
-			add_code(" = raytype_name(");
+			add_code(" = raytype_name(sg, ");
 			gen_symbol(Name);
 			add_code(");\n");
 		}
@@ -696,9 +697,9 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(result);
 
 		if (op.opname() == op_Dx) {
-			add_code(" = Dx(");
+			add_code(" = Dx(sg, ");
 		} else {
-			add_code(" = Dy(");
+			add_code(" = Dy(sg, ");
 		}
 
 		gen_symbol(src);
