@@ -47,6 +47,7 @@ static ustring op_Dy("Dy");
 static ustring op_min("min");
 static ustring op_max("max");
 static ustring op_pow("pow");
+static ustring op_closure("closure");
 
 std::string format_var(const std::string & name)
 {
@@ -739,8 +740,49 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
+	else if (op.opname() == op_closure)
+	{
+		Symbol &Result = *opargsym (op, 0);
+		int weighted   = opargsym(op, 1)->typespec().is_string() ? 0 : 1;
+		Symbol *weight = weighted ? opargsym (op, 1) : NULL;
+		Symbol &Id     = *opargsym (op, 1 + weighted);
+		
+		ustring closure_name = *((ustring *)Id.data());
+
+		const ClosureRegistry::ClosureEntry * clentry = shadingsys().find_closure(closure_name);
+		if (!clentry) {
+			shadingcontext()->error(
+				"Closure '%s' is not supported by the current renderer, called from %s:%d in shader \"%s\", layer %d \"%s\", group \"%s\"\n", 
+				closure_name, op.sourcefile(), op.sourceline(), 
+				inst()->shadername(), layer(), 
+				inst()->layername(), group().name());
+			return false;
+		}
+
+		// TODO: Currently we always assume there is no closure's 
+		// "prepare" and "setup" methods.
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(Strutil::format(" = closure_%s(sg, ", 
+			closure_name.c_str()));
+
+		int closure_param_offset = 2 + weighted;
+		for (int i = closure_param_offset; i < op.nargs(); ++i)
+		{
+			add_code((i != closure_param_offset) ? ", " : "");
+
+			Symbol & sym = *opargsym(op, i);
+			gen_symbol(sym);
+		}
+
+		add_code(");\n");
+
+		return true;
+	}
 	else
 	{
+		// Handle the general case as a function
 		gen_code(op);
 		add_code(";\n");
 
@@ -752,8 +794,11 @@ bool BackendGLSL::build_block(int beginop, int endop)
 {
     for (int opnum = beginop;  opnum < endop;  ++opnum) {
         const Opcode& op = inst()->ops()[opnum];
+		// We don't really use the generator here, just to 
+		// align with LLVM: we don't generate code when the 
+		// LLVM backend does not.
         const OpDescriptor *opd = shadingsys().op_descriptor (op.opname());
-        if (opd) {
+        if (opd && opd->llvmgen) {
 			if (!build_op(opnum)) {
 				return false;
 			}
