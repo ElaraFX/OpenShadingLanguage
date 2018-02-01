@@ -36,6 +36,7 @@ private:
 	void push_function(Symbol & function_name);
 	void pop_function();
 	void gen_typespec(const TypeSpec & typespec, const std::string & name);
+	void gen_data(const Symbol *dealiased);
 	void gen_symbol(Symbol & sym);
 	bool gen_code(const Opcode & op);
 	void call_layer(int layer, bool unconditional);

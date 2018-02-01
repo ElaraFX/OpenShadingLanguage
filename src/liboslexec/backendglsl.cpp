@@ -203,6 +203,47 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
     }
 }
 
+void BackendGLSL::gen_data(const Symbol *dealiased)
+{
+	TypeDesc t = dealiased->typespec().simpletype();
+	if (t.is_array()) {
+		add_code("{");
+	}
+	for (int a = 0; a < t.numelements(); ++a) {
+		if (t.is_array()) {
+			add_code((a != 0) ? ", " : "");
+		}
+		if (t.aggregate != 1) {
+			add_code(t.c_str());
+			add_code("(");
+		}
+		if (t.basetype == TypeDesc::FLOAT) {
+			for (int j = 0; j < t.aggregate; ++j) {
+				add_code((j != 0) ? ", " : "");
+				add_code(format_float(Strutil::format("%.9f", ((float *)dealiased->data())[j])));
+			}
+		} else if (t.basetype == TypeDesc::INT) {
+			for (int j = 0; j < t.aggregate; ++j) {
+				add_code((j != 0) ? ", " : "");
+				add_code(Strutil::format("%d", ((int *)dealiased->data())[j]));
+			}
+		} else if (t.basetype == TypeDesc::STRING) {
+			for (int j = 0; j < t.aggregate; ++j) {
+				add_code((j != 0) ? ", " : "");
+				add_code("\"");
+				add_code(Strutil::escape_chars(((ustring *)dealiased->data())[j].string()));
+				add_code("\"");
+			}
+		}
+		if (t.aggregate != 1) {
+			add_code(")");
+		}
+	}
+	if (t.is_array()) {
+		add_code("}");
+	}
+}
+
 void BackendGLSL::gen_symbol(Symbol & sym)
 {
 	Symbol* dealiased = sym.dealias();
@@ -222,43 +263,7 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 
 	if (dealiased->is_constant() && dealiased->data() != NULL)
 	{
-		TypeDesc t = dealiased->typespec().simpletype();
-		if (t.is_array()) {
-			add_code("{");
-		}
-		for (int a = 0; a < t.numelements(); ++a) {
-			if (t.is_array()) {
-				add_code((a != 0) ? ", " : "");
-			}
-			if (t.aggregate != 1) {
-				add_code(t.c_str());
-				add_code("(");
-			}
-			if (t.basetype == TypeDesc::FLOAT) {
-				for (int j = 0; j < t.aggregate; ++j) {
-					add_code((j != 0) ? ", " : "");
-					add_code(format_float(Strutil::format("%.9f", ((float *)dealiased->data())[j])));
-				}
-			} else if (t.basetype == TypeDesc::INT) {
-				for (int j = 0; j < t.aggregate; ++j) {
-					add_code((j != 0) ? ", " : "");
-					add_code(Strutil::format("%d", ((int *)dealiased->data())[j]));
-				}
-			} else if (t.basetype == TypeDesc::STRING) {
-				for (int j = 0; j < t.aggregate; ++j) {
-					add_code((j != 0) ? ", " : "");
-					add_code("\"");
-					add_code(Strutil::escape_chars(((ustring *)dealiased->data())[j].string()));
-					add_code("\"");
-				}
-			}
-			if (t.aggregate != 1) {
-				add_code(")");
-			}
-		}
-		if (t.is_array()) {
-			add_code("}");
-		}
+		gen_data(dealiased);
 	}
 	else
 	{
@@ -860,40 +865,11 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 				mangled_name = "sg." + mangled_name;
 			}
 
-			TypeSpec elemtype = sym.typespec().elementtype();
-
 			// Fill in the constant val
-			if (!sym.typespec().is_array()) {
-				begin_code(format_var(mangled_name));
-				if (elemtype.is_floatbased()) {
-					float float_val = ((float *)sym.data())[0];
-					add_code(format_float(Strutil::format(" = %.9f", float_val)));
-					add_code(";\n");
-				} else if (elemtype.is_string()) {
-					ustring string_val = ((ustring *)sym.data())[0];
-					add_code(Strutil::format(" = %s;\n", Strutil::escape_chars(string_val.c_str())));
-				} else if (elemtype.is_int()) {
-					int int_val = ((int *)sym.data())[0];
-					add_code(Strutil::format(" = %d;\n", int_val));
-				}
-			} else {
-				int arraylen = sym.typespec().arraylength();
-				for (int a = 0; a < arraylen; ++a) {
-					begin_code(format_var(mangled_name));
-					if (elemtype.is_floatbased()) {
-						float float_val = ((float *)sym.data())[0];
-						add_code(Strutil::format("[%d] = ", a));
-						add_code(format_float(Strutil::format("%.9f", float_val)));
-						add_code(";\n");
-					} else if (elemtype.is_string()) {
-						ustring string_val = ((ustring *)sym.data())[0];
-						add_code(Strutil::format("[%d] = %s;\n", a, Strutil::escape_chars(string_val.c_str())));
-					} else if (elemtype.is_int()) {
-						int int_val = ((int *)sym.data())[0];
-						add_code(Strutil::format("[%d] = %d;\n", a, int_val));
-					}
-				}
-			}
+			begin_code(format_var(mangled_name));
+			add_code(" = ");
+			gen_data(&sym);
+			add_code(";\n");
 		}
     }
 }
