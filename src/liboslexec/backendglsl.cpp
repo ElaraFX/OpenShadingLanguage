@@ -220,7 +220,7 @@ void BackendGLSL::gen_data(const Symbol *dealiased)
 		if (t.basetype == TypeDesc::FLOAT) {
 			for (int j = 0; j < t.aggregate; ++j) {
 				add_code((j != 0) ? ", " : "");
-				add_code(format_float(Strutil::format("%.9f", ((float *)dealiased->data())[j])));
+				add_code(format_float(Strutil::format("(float)%.9f", ((float *)dealiased->data())[j])));
 			}
 		} else if (t.basetype == TypeDesc::INT) {
 			for (int j = 0; j < t.aggregate; ++j) {
