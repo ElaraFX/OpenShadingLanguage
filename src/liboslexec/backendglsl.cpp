@@ -769,8 +769,18 @@ bool BackendGLSL::build_op(int opnum)
 		int closure_param_count = op.nargs() - closure_param_offset;
 		if (closure_param_count > 0)
 		{
-			add_code(Strutil::format(" = closure_%s(sg, ", 
-				closure_name.c_str()));
+			if (weighted)
+			{
+				add_code(" = ");
+				gen_symbol(*weight);
+				add_code(Strutil::format(" * closure_%s(sg, ", 
+					closure_name.c_str()));
+			}
+			else
+			{
+				add_code(Strutil::format(" = closure_%s(sg, ", 
+					closure_name.c_str()));
+			}
 
 			for (int i = closure_param_offset; i < op.nargs(); ++i)
 			{
@@ -782,8 +792,18 @@ bool BackendGLSL::build_op(int opnum)
 		}
 		else
 		{
-			add_code(Strutil::format(" = closure_%s(sg", 
-				closure_name.c_str()));
+			if (weighted)
+			{
+				add_code(" = ");
+				gen_symbol(*weight);
+				add_code(Strutil::format(" * closure_%s(sg", 
+					closure_name.c_str()));
+			}
+			else
+			{
+				add_code(Strutil::format(" = closure_%s(sg", 
+					closure_name.c_str()));
+			}
 		}
 
 		add_code(");\n");
