@@ -764,16 +764,26 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(Result);
-		add_code(Strutil::format(" = closure_%s(sg, ", 
-			closure_name.c_str()));
 
 		int closure_param_offset = 2 + weighted;
-		for (int i = closure_param_offset; i < op.nargs(); ++i)
+		int closure_param_count = op.nargs() - closure_param_offset;
+		if (closure_param_count > 0)
 		{
-			add_code((i != closure_param_offset) ? ", " : "");
+			add_code(Strutil::format(" = closure_%s(sg, ", 
+				closure_name.c_str()));
 
-			Symbol & sym = *opargsym(op, i);
-			gen_symbol(sym);
+			for (int i = closure_param_offset; i < op.nargs(); ++i)
+			{
+				add_code((i != closure_param_offset) ? ", " : "");
+
+				Symbol & sym = *opargsym(op, i);
+				gen_symbol(sym);
+			}
+		}
+		else
+		{
+			add_code(Strutil::format(" = closure_%s(sg", 
+				closure_name.c_str()));
 		}
 
 		add_code(");\n");
