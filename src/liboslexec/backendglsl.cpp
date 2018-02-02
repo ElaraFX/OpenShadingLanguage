@@ -50,6 +50,7 @@ static ustring op_pow("pow");
 static ustring op_closure("closure");
 static ustring op_texture("texture");
 static ustring u_alpha("alpha");
+static ustring u_width("width");
 
 std::string format_var(const std::string & name)
 {
@@ -825,7 +826,15 @@ bool BackendGLSL::build_op(int opnum)
 			first_optional_arg = 8;
 		}
 
+		// TODO: Support more optional arguments including 
+		// swidth, twidth, rwidth, 
+		// blur, sblur, tblur, rblur, 
+		// wrap, swrap, twrap, rwrap, 
+		// firstchannel, fill, interp, 
+		// time, subimage
+		// missingcolor, missingalpha
 		Symbol *alpha = NULL;
+		Symbol *width = NULL;
 
 		for (int a = first_optional_arg;  a < op.nargs(); ++a) {
 			Symbol &Name (*opargsym(op, a));
@@ -840,6 +849,8 @@ bool BackendGLSL::build_op(int opnum)
 
 			if (name == u_alpha) {
 				alpha = &Val;
+			} else if (name == u_width) {
+				width = &Val;
 			}
 		}
 
@@ -852,6 +863,13 @@ bool BackendGLSL::build_op(int opnum)
 		add_code(", ");
 		gen_symbol(T);
 		add_code(Strutil::format(", %d", nchans));
+
+		add_code(", ");
+		if (width != NULL) {
+			gen_symbol(*width);
+		} else {
+			add_code("(float)1.0");
+		}
 
 		if (alpha != NULL) {
 			add_code(", ");
