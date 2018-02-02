@@ -48,6 +48,8 @@ static ustring op_min("min");
 static ustring op_max("max");
 static ustring op_pow("pow");
 static ustring op_closure("closure");
+static ustring op_texture("texture");
+static ustring u_alpha("alpha");
 
 std::string format_var(const std::string & name)
 {
@@ -804,6 +806,56 @@ bool BackendGLSL::build_op(int opnum)
 				add_code(Strutil::format(" = closure_%s(sg", 
 					closure_name.c_str()));
 			}
+		}
+
+		add_code(");\n");
+
+		return true;
+	}
+	else if (op.opname() == op_texture)
+	{
+		Symbol &Result = *opargsym (op, 0);
+		Symbol &Filename = *opargsym (op, 1);
+		Symbol &S = *opargsym (op, 2);
+		Symbol &T = *opargsym (op, 3);
+		int nchans = Result.typespec().aggregate();
+
+		int first_optional_arg = 4;
+		if (op.nargs() > 4 && opargsym(op, 4)->typespec().is_float()) {
+			first_optional_arg = 8;
+		}
+
+		Symbol *alpha = NULL;
+
+		for (int a = first_optional_arg;  a < op.nargs(); ++a) {
+			Symbol &Name (*opargsym(op, a));
+			ustring name = *(ustring *)Name.data();
+			++a; // advance to next argument
+
+			if (!name) { // skip empty string param name
+				continue;
+			}
+
+			Symbol &Val (*opargsym(op, a));
+
+			if (name == u_alpha) {
+				alpha = &Val;
+			}
+		}
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = texture(sg, ");
+		gen_symbol(Filename);
+		add_code(", ");
+		gen_symbol(S);
+		add_code(", ");
+		gen_symbol(T);
+		add_code(Strutil::format(", %d", nchans));
+
+		if (alpha != NULL) {
+			add_code(", ");
+			gen_symbol(*alpha);
 		}
 
 		add_code(");\n");
