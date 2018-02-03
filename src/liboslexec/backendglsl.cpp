@@ -94,6 +94,11 @@ static ustring op_round("round");
 static ustring op_Dx("Dx");
 static ustring op_Dy("Dy");
 static ustring op_Dz("Dz");
+static ustring op_atan2("atan2");
+static ustring op_cross("cross");
+static ustring op_distance("distance");
+static ustring op_dot("dot");
+static ustring op_step("step");
 static ustring op_min("min");
 static ustring op_max("max");
 static ustring op_pow("pow");
@@ -961,6 +966,11 @@ bool BackendGLSL::build_op(int opnum)
 		return true;
 	}
 	else if (
+		op.opname() == op_atan2 || 
+		op.opname() == op_cross || 
+		op.opname() == op_distance || 
+		op.opname() == op_dot || 
+		op.opname() == op_step || 
 		op.opname() == op_min || 
 		op.opname() == op_max || 
 		op.opname() == op_pow)
@@ -971,15 +981,7 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(result);
-
-		if (op.opname() == op_min) {
-			add_code(" = min(");
-		} else if (op.opname() == op_max) {
-			add_code(" = max(");
-		} else {
-			add_code(" = pow(");
-		}
-
+		add_code(Strutil::format(" = %s(", op.opname().c_str()));
 		gen_symbol(a);
 		add_code(", ");
 		gen_symbol(b);
