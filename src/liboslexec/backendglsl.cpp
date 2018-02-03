@@ -25,6 +25,7 @@ static ustring op_return("return");
 static ustring op_exit("exit");
 static ustring op_useparam("useparam");
 static ustring op_assign("assign");
+static ustring op_arraycopy("arraycopy");
 static ustring op_neg("neg");
 static ustring op_compl("compl");
 static ustring op_add("add");
@@ -41,6 +42,11 @@ static ustring op_clamp("clamp");
 static ustring op_mix("mix");
 static ustring op_compref("compref");
 static ustring op_compassign("compassign");
+static ustring op_aref("aref");
+static ustring op_aassign("aassign");
+static ustring op_mxcompref("mxcompref");
+static ustring op_mxcompassign("mxcompassign");
+static ustring op_arraylength("arraylength");
 static ustring op_raytype("raytype");
 static ustring op_eq("eq");
 static ustring op_neq("neq");
@@ -48,12 +54,46 @@ static ustring op_lt("lt");
 static ustring op_le("le");
 static ustring op_gt("gt");
 static ustring op_ge("ge");
+static ustring op_abs("abs");
+static ustring op_acos("acos");
+static ustring op_asin("asin");
+static ustring op_atan("atan");
+static ustring op_cos("cos");
+static ustring op_cosh("cosh");
+static ustring op_degrees("degrees");
+static ustring op_determinant("determinant");
+static ustring op_erf("erf");
+static ustring op_erfc("erfc");
+static ustring op_exp("exp");
+static ustring op_exp2("exp2");
+static ustring op_expm1("expm1");
+static ustring op_fabs("fabs");
+static ustring op_hash("hash");
+static ustring op_inversesqrt("inversesqrt");
+static ustring op_isfinite("isfinite");
+static ustring op_isinf("isinf");
+static ustring op_isnan("isnan");
+static ustring op_length("length");
+static ustring op_log("log");
+static ustring op_log10("log10");
+static ustring op_log2("log2");
+static ustring op_logb("logb");
+static ustring op_normalize("normalize");
+static ustring op_radians("radians");
+static ustring op_sign("sign");
+static ustring op_sin("sin");
+static ustring op_sinh("sinh");
+static ustring op_sqrt("sqrt");
+static ustring op_tan("tan");
+static ustring op_tanh("tanh");
+static ustring op_transpose("transpose");
 static ustring op_floor("floor");
 static ustring op_ceil("ceil");
 static ustring op_trunc("trunc");
 static ustring op_round("round");
 static ustring op_Dx("Dx");
 static ustring op_Dy("Dy");
+static ustring op_Dz("Dz");
 static ustring op_min("min");
 static ustring op_max("max");
 static ustring op_pow("pow");
@@ -546,6 +586,7 @@ bool BackendGLSL::build_op(int opnum)
 	}
 	else if (
 		op.opname() == op_assign || 
+		op.opname() == op_arraycopy || 
 		op.opname() == op_neg || 
 		op.opname() == op_compl)
 	{
@@ -696,7 +737,9 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
-	else if (op.opname() == op_compref)
+	else if (
+		op.opname() == op_compref || 
+		op.opname() == op_aref)
 	{
 		Symbol& Result = *opargsym (op, 0);
 		Symbol& Val = *opargsym (op, 1);
@@ -712,7 +755,9 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
-	else if (op.opname() == op_compassign)
+	else if (
+		op.opname() == op_compassign || 
+		op.opname() == op_aassign)
 	{
 		Symbol& Result = *opargsym (op, 0);
 		Symbol& Index = *opargsym (op, 1);
@@ -725,6 +770,59 @@ bool BackendGLSL::build_op(int opnum)
 		add_code("] = ");
 		gen_symbol(Val);
 		add_code(";\n");
+
+		return true;
+	}
+	else if (op.opname() == op_mxcompref)
+	{
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& M = *opargsym (op, 1);
+		Symbol& Row = *opargsym (op, 2);
+		Symbol& Col = *opargsym (op, 3);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = ");
+		gen_symbol(M);
+		add_code("[");
+		gen_symbol(Row);
+		add_code("][");
+		gen_symbol(Col);
+		add_code("];\n");
+
+		return true;
+	}
+	else if (op.opname() == op_mxcompassign)
+	{
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& Row = *opargsym (op, 1);
+		Symbol& Col = *opargsym (op, 2);
+		Symbol& Val = *opargsym (op, 3);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code("[");
+		gen_symbol(Row);
+		add_code("][");
+		gen_symbol(Col);
+		add_code("] = ");
+		gen_symbol(Val);
+		add_code(";\n");
+
+		return true;
+	}
+	else if (op.opname() == op_arraylength)
+	{
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& A = *opargsym (op, 1);
+
+		int len = A.typespec().is_unsized_array() ? 
+			A.initializers() : 
+			A.typespec().arraylength();
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(Strutil::format(" = %d;\n", len));
 
 		return true;
 	}
@@ -789,6 +887,39 @@ bool BackendGLSL::build_op(int opnum)
 		return true;
 	}
 	else if (
+		op.opname() == op_abs || 
+		op.opname() == op_acos || 
+		op.opname() == op_asin || 
+		op.opname() == op_atan || 
+		op.opname() == op_cos || 
+		op.opname() == op_cosh || 
+		op.opname() == op_degrees || 
+		op.opname() == op_determinant || 
+		op.opname() == op_erf || 
+		op.opname() == op_erfc || 
+		op.opname() == op_exp || 
+		op.opname() == op_exp2 || 
+		op.opname() == op_expm1 || 
+		op.opname() == op_fabs || 
+		op.opname() == op_hash || 
+		op.opname() == op_inversesqrt || 
+		op.opname() == op_isfinite || 
+		op.opname() == op_isinf || 
+		op.opname() == op_isnan || 
+		op.opname() == op_length || 
+		op.opname() == op_log || 
+		op.opname() == op_log10 || 
+		op.opname() == op_log2 || 
+		op.opname() == op_logb || 
+		op.opname() == op_normalize || 
+		op.opname() == op_radians || 
+		op.opname() == op_sign || 
+		op.opname() == op_sin || 
+		op.opname() == op_sinh || 
+		op.opname() == op_sqrt || 
+		op.opname() == op_tan || 
+		op.opname() == op_tanh || 
+		op.opname() == op_transpose || 
 		op.opname() == op_floor || 
 		op.opname() == op_ceil || 
 		op.opname() == op_trunc || 
@@ -799,17 +930,7 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(result);
-
-		if (op.opname() == op_floor) {
-			add_code(" = floor(");
-		} else if (op.opname() == op_ceil) {
-			add_code(" = ceil(");
-		} else if (op.opname() == op_trunc) {
-			add_code(" = trunc(");
-		} else {
-			add_code(" = round(");
-		}
-
+		add_code(Strutil::format(" = %s(", op.opname().c_str()));
 		gen_symbol(src);
 		add_code(");\n");
 
@@ -817,7 +938,8 @@ bool BackendGLSL::build_op(int opnum)
 	}
 	else if (
 		op.opname() == op_Dx || 
-		op.opname() == op_Dy)
+		op.opname() == op_Dy || 
+		op.opname() == op_Dz)
 	{
 		Symbol & result = *opargsym(op, 0);
 		Symbol & src = *opargsym(op, 1);
@@ -827,8 +949,10 @@ bool BackendGLSL::build_op(int opnum)
 
 		if (op.opname() == op_Dx) {
 			add_code(" = Dx(sg, ");
-		} else {
+		} else if (op.opname() == op_Dy) {
 			add_code(" = Dy(sg, ");
+		} else {
+			add_code(" = Dz(sg, ");
 		}
 
 		gen_symbol(src);
