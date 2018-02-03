@@ -31,6 +31,13 @@ static ustring op_sub("sub");
 static ustring op_mul("mul");
 static ustring op_div("div");
 static ustring op_modulus("modulus");
+static ustring op_bitand("bitand");
+static ustring op_bitor("bitor");
+static ustring op_xor("xor");
+static ustring op_shl("shl");
+static ustring op_shr("shr");
+static ustring op_clamp("clamp");
+static ustring op_mix("mix");
 static ustring op_compref("compref");
 static ustring op_compassign("compassign");
 static ustring op_raytype("raytype");
@@ -609,6 +616,79 @@ bool BackendGLSL::build_op(int opnum)
 			gen_symbol(b);
 			add_code(";\n");
 		}
+
+		return true;
+	}
+	else if (
+		op.opname() == op_bitand || 
+		op.opname() == op_bitor || 
+		op.opname() == op_xor || 
+		op.opname() == op_shl || 
+		op.opname() == op_shr)
+	{
+		Symbol& result = *opargsym (op, 0);
+		Symbol& a = *opargsym (op, 1);
+		Symbol& b = *opargsym (op, 2);
+
+		begin_code("");
+		gen_symbol(result);
+		add_code(" = ");
+		gen_symbol(a);
+
+		if (op.opname() == op_bitand) {
+			add_code(" & ");
+		} else if (op.opname() == op_bitor) {
+			add_code(" | ");
+		} else if (op.opname() == op_xor) {
+			add_code(" ^ ");
+		} else if (op.opname() == op_shl) {
+			add_code(" << ");
+		} else {
+			add_code(" >> ");
+		}
+
+		gen_symbol(b);
+		add_code(";\n");
+
+		return true;
+	}
+	else if (op.opname() == op_clamp)
+	{
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& X = *opargsym (op, 1);
+		Symbol& Min = *opargsym (op, 2);
+		Symbol& Max = *opargsym (op, 3);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = min(max(");
+		gen_symbol(X);
+		add_code(", ");
+		gen_symbol(Min);
+		add_code("), ");
+		gen_symbol(Max);
+		add_code(");\n");
+
+		return true;
+	}
+	else if (op.opname() == op_mix)
+	{
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& A = *opargsym (op, 1);
+		Symbol& B = *opargsym (op, 2);
+		Symbol& X = *opargsym (op, 3);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = (1.0 - ");
+		gen_symbol(X);
+		add_code(") * ");
+		gen_symbol(A);
+		add_code(" + ");
+		gen_symbol(X);
+		add_code(" * ");
+		gen_symbol(B);
+		add_code(";\n");
 
 		return true;
 	}
