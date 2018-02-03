@@ -49,6 +49,7 @@ static ustring op_max("max");
 static ustring op_pow("pow");
 static ustring op_closure("closure");
 static ustring op_texture("texture");
+static ustring op_getattribute("getattribute");
 static ustring u_alpha("alpha");
 static ustring u_width("width");
 
@@ -876,6 +877,44 @@ bool BackendGLSL::build_op(int opnum)
 			gen_symbol(*alpha);
 		}
 
+		add_code(");\n");
+
+		return true;
+	}
+	else if (op.opname() == op_getattribute)
+	{
+		int nargs = op.nargs();
+
+		bool array_lookup = opargsym(op, nargs - 2)->typespec().is_int();
+		bool object_lookup = opargsym(op, 2)->typespec().is_string() && nargs >= 4;
+		int object_slot = (int)object_lookup;
+		int attrib_slot = object_slot + 1;
+		int index_slot = array_lookup ? nargs - 2 : 0;
+
+		Symbol& Result      = *opargsym (op, 0);
+		Symbol& ObjectName  = *opargsym (op, object_slot); // only valid if object_slot is true
+		Symbol& Attribute   = *opargsym (op, attrib_slot);
+		Symbol& Index       = *opargsym (op, index_slot);  // only valid if array_lookup is true
+		Symbol& Destination = *opargsym (op, nargs - 1);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = getattribute(sg, ");
+		if (object_lookup) {
+			gen_symbol(ObjectName);
+		} else {
+			add_code("");
+		}
+		add_code(", ");
+		gen_symbol(Attribute);
+		if (array_lookup) {
+			add_code(", true, ");
+		} else {
+			add_code(", false, ");
+		}
+		gen_symbol(Index);
+		add_code(", ");
+		gen_symbol(Destination);
 		add_code(");\n");
 
 		return true;
