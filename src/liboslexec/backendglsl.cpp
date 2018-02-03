@@ -29,6 +29,7 @@ static ustring op_add("add");
 static ustring op_sub("sub");
 static ustring op_mul("mul");
 static ustring op_div("div");
+static ustring op_modulus("modulus");
 static ustring op_compref("compref");
 static ustring op_compassign("compassign");
 static ustring op_raytype("raytype");
@@ -574,6 +575,34 @@ bool BackendGLSL::build_op(int opnum)
 
 		gen_symbol(b);
 		add_code(";\n");
+
+		return true;
+	}
+	else if (op.opname() == op_modulus)
+	{
+		Symbol& result = *opargsym (op, 0);
+		Symbol& a = *opargsym (op, 1);
+		Symbol& b = *opargsym (op, 2);
+
+		bool is_float = result.typespec().is_floatbased();
+
+		if (is_float) {
+			begin_code("");
+			gen_symbol(result);
+			add_code(" = fmod(");
+			gen_symbol(a);
+			add_code(", ");
+			gen_symbol(b);
+			add_code(");\n");
+		} else {
+			begin_code("");
+			gen_symbol(result);
+			add_code(" = ");
+			gen_symbol(a);
+			add_code(" % ");
+			gen_symbol(b);
+			add_code(";\n");
+		}
 
 		return true;
 	}
