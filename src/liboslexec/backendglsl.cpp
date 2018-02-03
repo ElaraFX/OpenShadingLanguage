@@ -25,6 +25,7 @@ static ustring op_return("return");
 static ustring op_exit("exit");
 static ustring op_useparam("useparam");
 static ustring op_assign("assign");
+static ustring op_neg("neg");
 static ustring op_add("add");
 static ustring op_sub("sub");
 static ustring op_mul("mul");
@@ -535,7 +536,9 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
-	else if (op.opname() == op_assign)
+	else if (
+		op.opname() == op_assign || 
+		op.opname() == op_neg)
 	{
 		Symbol & result = *opargsym(op, 0);
 		Symbol & src = *opargsym(op, 1);
@@ -543,6 +546,9 @@ bool BackendGLSL::build_op(int opnum)
 		begin_code("");
 		gen_symbol(result);
 		add_code(" = ");
+		if (op.opname() == op_neg) {
+			add_code("- ");
+		}
 		gen_symbol(src);
 		add_code(";\n");
 
