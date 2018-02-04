@@ -107,8 +107,10 @@ static ustring op_texture("texture");
 static ustring op_getattribute("getattribute");
 static ustring op_isconstant("isconstant");
 static ustring op_smoothstep("smoothstep");
-static ustring op_construct_color("consturct_color");
-static ustring op_construct_triple("construct_triple");
+static ustring op_color("color");
+static ustring op_normal("normal");
+static ustring op_point("point");
+static ustring op_vector("vector");
 static ustring op_matrix("matrix");
 static ustring op_getmatrix("getmatrix");
 static ustring op_transform("transform");
@@ -119,14 +121,21 @@ static ustring op_or("or");
 static ustring op_texture3d("texture3d");
 static ustring op_trace("trace");
 static ustring op_noise("noise");
+static ustring op_cellnoise("cellnoise");
+static ustring op_pnoise("pnoise");
+static ustring op_psnoise("psnoise");
+static ustring op_snoise("snoise");
 static ustring op_gettextureinfo("gettextureinfo");
 static ustring op_getmessage("getmessage");
 static ustring op_setmessage("setmessage");
 static ustring op_calculatenormal("calculatenormal");
 static ustring op_area("area");
 static ustring op_spline("spline");
+static ustring op_splineinverse("splineinverse");
 static ustring op_blackbody("blackbody");
 static ustring op_luminance("luminance");
+static ustring op_backfacing("backfacing");
+static ustring op_surfacearea("surfacearea");
 
 static ustring u_alpha("alpha");
 static ustring u_width("width");
@@ -1206,11 +1215,14 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
-	else if (op.opname() == op_construct_color)
+	else if (op.opname() == op_color)
 	{
 		return true;
 	}
-	else if (op.opname() == op_construct_triple)
+	else if (
+		op.opname() == op_normal || 
+		op.opname() == op_point || 
+		op.opname() == op_vector)
 	{
 		return true;
 	}
@@ -1248,7 +1260,12 @@ bool BackendGLSL::build_op(int opnum)
 	{
 		return true;
 	}
-	else if (op.opname() == op_noise)
+	else if (
+		op.opname() == op_noise || 
+		op.opname() == op_cellnoise || 
+		op.opname() == op_pnoise || 
+		op.opname() == op_psnoise || 
+		op.opname() == op_snoise)
 	{
 		return true;
 	}
@@ -1272,7 +1289,9 @@ bool BackendGLSL::build_op(int opnum)
 	{
 		return true;
 	}
-	else if (op.opname() == op_spline)
+	else if (
+		op.opname() == op_spline ||
+		op.opname() == op_splineinverse)
 	{
 		return true;
 	}
@@ -1284,10 +1303,17 @@ bool BackendGLSL::build_op(int opnum)
 	{
 		return true;
 	}
+	else if (
+		op.opname() == op_backfacing || 
+		op.opname() == op_surfacearea)
+	{
+		return true;
+	}
 	else
 	{
 		// Not supported ops including:
-		// printf
+		// error/format/printf
+		// getchar
 		// regex
 		// environment
 		// pointcloud_search
@@ -1297,6 +1323,11 @@ bool BackendGLSL::build_op(int opnum)
 		// dict_next
 		// dict_value
 		// split
+		// stof/stoi
+		// strtof/strtoi
+		// strlen
+		// substr
+
 		return false;
 	}
 }
