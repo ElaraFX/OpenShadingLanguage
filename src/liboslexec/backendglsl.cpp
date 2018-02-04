@@ -129,11 +129,8 @@ static ustring op_psnoise("psnoise");
 static ustring op_snoise("snoise");
 static ustring op_gettextureinfo("gettextureinfo");
 static ustring op_getmessage("getmessage");
-static ustring op_setmessage("setmessage");
 static ustring op_calculatenormal("calculatenormal");
 static ustring op_area("area");
-static ustring op_spline("spline");
-static ustring op_splineinverse("splineinverse");
 static ustring op_blackbody("blackbody");
 static ustring op_wavelength_color("wavelength_color");
 static ustring op_luminance("luminance");
@@ -142,6 +139,8 @@ static ustring op_surfacearea("surfacearea");
 
 static ustring u_alpha("alpha");
 static ustring u_width("width");
+static ustring u_mindist("mindist");
+static ustring u_maxdist("maxdist");
 
 std::string format_var(const std::string & name)
 {
@@ -1422,28 +1421,197 @@ bool BackendGLSL::build_op(int opnum)
 		op.opname() == op_transformn || 
 		op.opname() == op_transformv)
 	{
+		int nargs = op.nargs();
+
+		Symbol *Result = opargsym (op, 0);
+		Symbol *From = (nargs == 3) ? NULL : opargsym (op, 1);
+		Symbol *To = opargsym (op, (nargs == 3) ? 1 : 2);
+		Symbol *P = opargsym (op, (nargs == 3) ? 2 : 3);
+
+		if (From == NULL) {
+			begin_code("");
+			gen_symbol(*Result);
+			add_code(Strutil::format(" = %s(", op.opname().c_str()));
+			gen_symbol(*To);
+			add_code(", ");
+			gen_symbol(*P);
+			add_code(");\n");
+		} else {
+			begin_code("");
+			gen_symbol(*Result);
+			add_code(Strutil::format(" = %s(", op.opname().c_str()));
+			gen_symbol(*From);
+			add_code(", ");
+			gen_symbol(*To);
+			add_code(", ");
+			gen_symbol(*P);
+			add_code(");\n");
+		}
+
 		return true;
 	}
 	else if (op.opname() == op_filterwidth)
 	{
+		Symbol& Result (*opargsym (op, 0));
+		Symbol& Src (*opargsym (op, 1));
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = filterwidth(");
+		gen_symbol(Src);
+		add_code(");\n");
+
 		return true;
 	}
 	else if (op.opname() == op_sincos)
 	{
+		Symbol& Theta   = *opargsym (op, 0);
+		Symbol& Sin_out = *opargsym (op, 1);
+		Symbol& Cos_out = *opargsym (op, 2);
+
+		begin_code("sincos(");
+		gen_symbol(Theta);
+		add_code(", ");
+		gen_symbol(Sin_out);
+		add_code(", ");
+		gen_symbol(Cos_out);
+		add_code(");\n");
+
 		return true;
 	}
 	else if (
 		op.opname() == op_and || 
 		op.opname() == op_or)
 	{
+		Symbol& result = *opargsym (op, 0);
+		Symbol& a = *opargsym (op, 1);
+		Symbol& b = *opargsym (op, 2);
+
+		begin_code("");
+		gen_symbol(result);
+		add_code(" = (");
+		gen_symbol(a);
+		if (op.opname() == op_and) {
+			add_code(" && ");
+		} else {
+			add_code(" || ");
+		}
+		gen_symbol(b);
+		add_code(");\n");
+
 		return true;
 	}
 	else if (op.opname() == op_texture3d)
 	{
+		Symbol &Result = *opargsym (op, 0);
+		Symbol &Filename = *opargsym (op, 1);
+		Symbol &P = *opargsym (op, 2);
+		int nchans = Result.typespec().aggregate();
+
+		int first_optional_arg = 3;
+		if (op.nargs() > 3 && opargsym(op, 3)->typespec().is_triple()) {
+			first_optional_arg = 5;
+		}
+
+		// TODO: Support more optional arguments including 
+		// swidth, twidth, rwidth, 
+		// blur, sblur, tblur, rblur, 
+		// wrap, swrap, twrap, rwrap, 
+		// firstchannel, fill, interp, 
+		// time, subimage
+		// missingcolor, missingalpha
+		Symbol *alpha = NULL;
+		Symbol *width = NULL;
+
+		for (int a = first_optional_arg;  a < op.nargs(); ++a) {
+			Symbol &Name (*opargsym(op, a));
+			ustring name = *(ustring *)Name.data();
+			++a; // advance to next argument
+
+			if (!name) { // skip empty string param name
+				continue;
+			}
+
+			Symbol &Val (*opargsym(op, a));
+
+			if (name == u_alpha) {
+				alpha = &Val;
+			} else if (name == u_width) {
+				width = &Val;
+			}
+		}
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = texture3d(sg, ");
+		gen_symbol(Filename);
+		add_code(", ");
+		gen_symbol(P);
+		add_code(Strutil::format(", %d", nchans));
+
+		add_code(", ");
+		if (width != NULL) {
+			gen_symbol(*width);
+		} else {
+			add_code("(float)1.0");
+		}
+
+		if (alpha != NULL) {
+			add_code(", ");
+			gen_symbol(*alpha);
+		}
+
+		add_code(");\n");
+
 		return true;
 	}
 	else if (op.opname() == op_trace)
 	{
+		Symbol &Result = *opargsym (op, 0);
+		Symbol &Pos = *opargsym (op, 1);
+		Symbol &Dir = *opargsym (op, 2);
+		int first_optional_arg = 3;
+
+		// TODO: Support optional arguments including:
+		// shade
+		// traceset
+		Symbol *mindist = NULL;
+		Symbol *maxdist = NULL;
+		for (int a = first_optional_arg; a < op.nargs(); ++a) {
+			Symbol &Name (*opargsym(op,a));
+			ustring name = *(ustring *)Name.data();
+
+			++a;  // advance to next argument
+			Symbol &Val (*opargsym(op, a));
+			TypeDesc valtype = Val.typespec().simpletype ();
+			
+			if (name == u_mindist && valtype == TypeDesc::FLOAT) {
+				mindist = &Val;
+			} else if (name == u_maxdist && valtype == TypeDesc::FLOAT) {
+				maxdist = &Val;
+			}
+		}
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = trace(");
+		gen_symbol(Pos);
+		add_code(", ");
+		gen_symbol(Dir);
+		add_code(", ");
+		if (mindist != NULL) {
+			gen_symbol(*mindist);
+		} else {
+			add_code("(float)1.0e-5");
+		}
+		add_code(", ");
+		if (maxdist != NULL) {
+			gen_symbol(*maxdist);
+		} else {
+			add_code("(float)1.0e+30");
+		}
+		add_code(");\n");
+
 		return true;
 	}
 	else if (
@@ -1453,48 +1621,201 @@ bool BackendGLSL::build_op(int opnum)
 		op.opname() == op_psnoise || 
 		op.opname() == op_snoise)
 	{
+		bool periodic = (op.opname() == Strings::pnoise);
+
+		int arg = 0;   // Next arg to read
+		Symbol &Result = *opargsym (op, arg++);
+		int outdim = Result.typespec().is_triple() ? 3 : 1;
+		Symbol *Name = opargsym (op, arg++);
+		ustring name;
+		if (Name->typespec().is_string()) {
+			name = Name->is_constant() ? *(ustring *)Name->data() : ustring();
+		} else {
+			// Not a string, must be the old-style noise/pnoise
+			--arg;  // forget that arg
+			Name = NULL;
+			name = op.opname();
+		}
+
+		Symbol *S = opargsym (op, arg++), *T = NULL;
+		Symbol *Sper = NULL, *Tper = NULL;
+		int indim = S->typespec().is_triple() ? 3 : 1;
+
+		if (periodic) {
+			if (op.nargs() > (arg+1) &&
+					(opargsym(op,arg+1)->typespec().is_float() ||
+					 opargsym(op,arg+1)->typespec().is_triple())) {
+				// 2D or 4D
+				++indim;
+				T = opargsym (op, arg++);
+			}
+			Sper = opargsym (op, arg++);
+			if (indim == 2 || indim == 4)
+				Tper = opargsym (op, arg++);
+		} else {
+			// non-periodic case
+			if (op.nargs() > arg && opargsym(op,arg)->typespec().is_float()) {
+				// either 2D or 4D, so needs a second index
+				++indim;
+				T = opargsym (op, arg++);
+			}
+		}
+
+		bool pass_name = false;
+		if (! name) {
+			// name is not a constant
+			name = periodic ? Strings::genericpnoise : Strings::genericnoise;
+			pass_name = true;
+		} else if (name == Strings::perlin || name == Strings::snoise ||
+				   name == Strings::psnoise) {
+			name = periodic ? Strings::psnoise : Strings::snoise;
+			// derivs = false;
+		} else if (name == Strings::uperlin || name == Strings::noise ||
+				   name == Strings::pnoise) {
+			name = periodic ? Strings::pnoise : Strings::noise;
+			// derivs = false;
+		} else if (name == Strings::cell || name == Strings::cellnoise) {
+			name = periodic ? Strings::pcellnoise : Strings::cellnoise;
+		} else if (name == Strings::simplex && !periodic) {
+			name = Strings::simplexnoise;
+		} else if (name == Strings::usimplex && !periodic) {
+			name = Strings::usimplexnoise;
+		} else if (name == Strings::gabor) {
+			// already named
+			pass_name = true;
+			name = periodic ? Strings::gaborpnoise : Strings::gabornoise;
+		} else {
+			shadingcontext()->error ("%snoise type \"%s\" is unknown, called from (%s:%d)",
+									(periodic ? "periodic " : ""), name.c_str(),
+									op.sourcefile().c_str(), op.sourceline());
+			return false;
+		}
+
+		// TODO: Support optional arguments including:
+		// anisotropic
+		// do_filter
+		// direction
+		// bandwidth
+		// impulses
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = ");
+		if (pass_name) {
+			gen_symbol(*Name);
+		} else {
+			add_code(name.c_str());
+		}
+		add_code("(sg, ");
+		gen_symbol(*S);
+		if (T) {
+			add_code(", ");
+			gen_symbol(*T);
+		}
+
+		if (periodic) {
+			add_code(", ");
+			gen_symbol(*Sper);
+			if (Tper) {
+				add_code(", ");
+				gen_symbol(*Tper);
+			}
+		}
+
+		add_code(");\n");
+
 		return true;
 	}
 	else if (op.opname() == op_gettextureinfo)
 	{
+		Symbol& Result   = *opargsym (op, 0);
+		Symbol& Filename = *opargsym (op, 1);
+		Symbol& Dataname = *opargsym (op, 2);
+		Symbol& Data     = *opargsym (op, 3);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = gettextureinfo(");
+		gen_symbol(Filename);
+		add_code(", ");
+		gen_symbol(Dataname);
+		add_code(", ");
+		gen_symbol(Data);
+		add_code(");\n");
+
 		return true;
 	}
 	else if (op.opname() == op_getmessage)
 	{
-		return true;
-	}
-	else if (op.opname() == op_setmessage)
-	{
+		int has_source = (op.nargs() == 4);
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& Source = *opargsym (op, 1);
+		Symbol& Name   = *opargsym (op, 1+has_source);
+		Symbol& Data   = *opargsym (op, 2+has_source);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = getmessage_");
+		gen_symbol(Source);
+		add_code("_");
+		gen_symbol(Name);
+		add_code("(");
+		gen_symbol(Data);
+		add_code(");\n");
+
 		return true;
 	}
 	else if (op.opname() == op_calculatenormal)
 	{
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& P      = *opargsym (op, 1);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = calculatenormal(sg, ");
+		gen_symbol(P);
+		add_code(");\n");
+
 		return true;
 	}
 	else if (op.opname() == op_area)
 	{
-		return true;
-	}
-	else if (
-		op.opname() == op_spline ||
-		op.opname() == op_splineinverse)
-	{
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& P      = *opargsym (op, 1);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = area(");
+		gen_symbol(P);
+		add_code(");\n");
+
 		return true;
 	}
 	else if (
 		op.opname() == op_blackbody || 
-		op.opname() == op_wavelength_color)
+		op.opname() == op_wavelength_color || 
+		op.opname() == op_luminance)
 	{
-		return true;
-	}
-	else if (op.opname() == op_luminance)
-	{
+		Symbol &Result (*opargsym (op, 0));
+		Symbol &Src (*opargsym (op, 1));
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(Strutil::format(" = %s(sg, ", op.opname().c_str()));
+		gen_symbol(Src);
+		add_code(");\n");
+
 		return true;
 	}
 	else if (
 		op.opname() == op_backfacing || 
 		op.opname() == op_surfacearea)
 	{
+		Symbol &Result (*opargsym (op, 0));
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(Strutil::format(" = sg.%s;\n", op.opname().c_str()));
+
 		return true;
 	}
 	else
@@ -1504,6 +1825,8 @@ bool BackendGLSL::build_op(int opnum)
 		// getchar
 		// regex
 		// environment
+		// setmessage
+		// spline/splineinverse
 		// pointcloud_search
 		// pointcloud_get
 		// pointcloud_write
