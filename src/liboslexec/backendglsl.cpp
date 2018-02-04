@@ -107,6 +107,27 @@ static ustring op_texture("texture");
 static ustring op_getattribute("getattribute");
 static ustring op_isconstant("isconstant");
 static ustring op_smoothstep("smoothstep");
+static ustring op_construct_color("consturct_color");
+static ustring op_construct_triple("construct_triple");
+static ustring op_matrix("matrix");
+static ustring op_getmatrix("getmatrix");
+static ustring op_transform("transform");
+static ustring op_filterwidth("filterwidth");
+static ustring op_sincos("sincos");
+static ustring op_and("and");
+static ustring op_or("or");
+static ustring op_texture3d("texture3d");
+static ustring op_trace("trace");
+static ustring op_noise("noise");
+static ustring op_gettextureinfo("gettextureinfo");
+static ustring op_getmessage("getmessage");
+static ustring op_setmessage("setmessage");
+static ustring op_calculatenormal("calculatenormal");
+static ustring op_area("area");
+static ustring op_spline("spline");
+static ustring op_blackbody("blackbody");
+static ustring op_luminance("luminance");
+
 static ustring u_alpha("alpha");
 static ustring u_width("width");
 
@@ -331,21 +352,6 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 	{
 		add_code(format_var(mangled_name));
 	}
-}
-
-bool BackendGLSL::gen_code(const Opcode & op)
-{
-	begin_code(op.opname().string());
-	add_code(" (sg, ");
-	for (int i = 0; i < op.nargs(); ++i)
-	{
-		add_code((i != 0) ? ", " : "");
-
-		Symbol & sym = *opargsym(op, i);
-		gen_symbol(sym);
-	}
-	add_code(")");
-	return true;
 }
 
 void BackendGLSL::call_layer(int layer, bool unconditional)
@@ -1200,13 +1206,98 @@ bool BackendGLSL::build_op(int opnum)
 
 		return true;
 	}
+	else if (op.opname() == op_construct_color)
+	{
+		return true;
+	}
+	else if (op.opname() == op_construct_triple)
+	{
+		return true;
+	}
+	else if (op.opname() == op_matrix)
+	{
+		return true;
+	}
+	else if (op.opname() == op_getmatrix)
+	{
+		return true;
+	}
+	else if (op.opname() == op_transform)
+	{
+		return true;
+	}
+	else if (op.opname() == op_filterwidth)
+	{
+		return true;
+	}
+	else if (op.opname() == op_sincos)
+	{
+		return true;
+	}
+	else if (
+		op.opname() == op_and || 
+		op.opname() == op_or)
+	{
+		return true;
+	}
+	else if (op.opname() == op_texture3d)
+	{
+		return true;
+	}
+	else if (op.opname() == op_trace)
+	{
+		return true;
+	}
+	else if (op.opname() == op_noise)
+	{
+		return true;
+	}
+	else if (op.opname() == op_gettextureinfo)
+	{
+		return true;
+	}
+	else if (op.opname() == op_getmessage)
+	{
+		return true;
+	}
+	else if (op.opname() == op_setmessage)
+	{
+		return true;
+	}
+	else if (op.opname() == op_calculatenormal)
+	{
+		return true;
+	}
+	else if (op.opname() == op_area)
+	{
+		return true;
+	}
+	else if (op.opname() == op_spline)
+	{
+		return true;
+	}
+	else if (op.opname() == op_blackbody)
+	{
+		return true;
+	}
+	else if (op.opname() == op_luminance)
+	{
+		return true;
+	}
 	else
 	{
-		// Handle the general case as a function
-		gen_code(op);
-		add_code(";\n");
-
-		return true;
+		// Not supported ops including:
+		// printf
+		// regex
+		// environment
+		// pointcloud_search
+		// pointcloud_get
+		// pointcloud_write
+		// dict_find
+		// dict_next
+		// dict_value
+		// split
+		return false;
 	}
 }
 
