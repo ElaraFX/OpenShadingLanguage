@@ -114,6 +114,8 @@ static ustring op_vector("vector");
 static ustring op_matrix("matrix");
 static ustring op_getmatrix("getmatrix");
 static ustring op_transform("transform");
+static ustring op_transformn("transformn");
+static ustring op_transformv("transformv");
 static ustring op_filterwidth("filterwidth");
 static ustring op_sincos("sincos");
 static ustring op_and("and");
@@ -133,6 +135,7 @@ static ustring op_area("area");
 static ustring op_spline("spline");
 static ustring op_splineinverse("splineinverse");
 static ustring op_blackbody("blackbody");
+static ustring op_wavelength_color("wavelength_color");
 static ustring op_luminance("luminance");
 static ustring op_backfacing("backfacing");
 static ustring op_surfacearea("surfacearea");
@@ -1234,7 +1237,10 @@ bool BackendGLSL::build_op(int opnum)
 	{
 		return true;
 	}
-	else if (op.opname() == op_transform)
+	else if (
+		op.opname() == op_transform || 
+		op.opname() == op_transformn || 
+		op.opname() == op_transformv)
 	{
 		return true;
 	}
@@ -1295,7 +1301,9 @@ bool BackendGLSL::build_op(int opnum)
 	{
 		return true;
 	}
-	else if (op.opname() == op_blackbody)
+	else if (
+		op.opname() == op_blackbody || 
+		op.opname() == op_wavelength_color)
 	{
 		return true;
 	}
@@ -1312,7 +1320,7 @@ bool BackendGLSL::build_op(int opnum)
 	else
 	{
 		// Not supported ops including:
-		// error/format/printf
+		// error/warning/format/printf
 		// getchar
 		// regex
 		// environment
