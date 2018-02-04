@@ -1220,6 +1220,37 @@ bool BackendGLSL::build_op(int opnum)
 	}
 	else if (op.opname() == op_color)
 	{
+		Symbol& Result = *opargsym (op, 0);
+		bool using_space = (op.nargs() == 5);
+		Symbol& Space = *opargsym (op, 1);
+		Symbol& X = *opargsym (op, 1 + using_space);
+		Symbol& Y = *opargsym (op, 2 + using_space);
+		Symbol& Z = *opargsym (op, 3 + using_space);
+
+		if (using_space) {
+			begin_code("");
+			gen_symbol(Result);
+			add_code(" = ");
+			gen_symbol(Space);
+			add_code("_to_rgb(color(");
+			gen_symbol(X);
+			add_code(", ");
+			gen_symbol(Y);
+			add_code(", ");
+			gen_symbol(Z);
+			add_code("));\n");
+		} else {
+			begin_code("");
+			gen_symbol(Result);
+			add_code(" = color(");
+			gen_symbol(X);
+			add_code(", ");
+			gen_symbol(Y);
+			add_code(", ");
+			gen_symbol(Z);
+			add_code(");\n");
+		}
+
 		return true;
 	}
 	else if (
@@ -1227,10 +1258,144 @@ bool BackendGLSL::build_op(int opnum)
 		op.opname() == op_point || 
 		op.opname() == op_vector)
 	{
+		Symbol& Result = *opargsym (op, 0);
+		bool using_space = (op.nargs() == 5);
+		Symbol& Space = *opargsym (op, 1);
+		Symbol& X = *opargsym (op, 1 + using_space);
+		Symbol& Y = *opargsym (op, 2 + using_space);
+		Symbol& Z = *opargsym (op, 3 + using_space);
+
+		if (using_space) {
+			begin_code("");
+			gen_symbol(Result);
+			add_code(" = ");
+			gen_symbol(Space);
+			add_code(Strutil::format("_to_common(%s(", op.opname().c_str()));
+			gen_symbol(X);
+			add_code(", ");
+			gen_symbol(Y);
+			add_code(", ");
+			gen_symbol(Z);
+			add_code("));\n");
+		} else {
+			begin_code("");
+			gen_symbol(Result);
+			add_code(Strutil::format(" = %s(", op.opname().c_str()));
+			gen_symbol(X);
+			add_code(", ");
+			gen_symbol(Y);
+			add_code(", ");
+			gen_symbol(Z);
+			add_code(");\n");
+		}
+
 		return true;
 	}
 	else if (op.opname() == op_matrix)
 	{
+		Symbol& Result = *opargsym (op, 0);
+		int nargs = op.nargs();
+		bool using_space = (nargs == 3 || nargs == 18);
+		bool using_two_spaces = (nargs == 3 && opargsym(op, 2)->typespec().is_string());
+		int nfloats = nargs - 1 - (int)using_space;
+
+		if (using_two_spaces) {
+			Symbol& from = *opargsym (op, 1);
+			Symbol& to = *opargsym (op, 2);
+
+			begin_code("");
+			gen_symbol(Result);
+			add_code(" = matrix_");
+			gen_symbol(from);
+			add_code("_to_");
+			gen_symbol(to);
+			add_code("(");
+
+			if (nfloats == 1) {
+				Symbol& val = *opargsym (op, 3);
+				for (int i = 0; i < 16; ++i) {
+					if (i != 0) {
+						add_code(", ");
+					}
+					if ((i % 4) == (i / 4)) {
+						gen_symbol(val);
+					} else {
+						add_code("(float)0");
+					}
+				}
+			} else {
+				for (int i = 0; i < 16; ++i) {
+					Symbol& val = *opargsym (op, i + 3);
+					if (i != 0) {
+						add_code(", ");
+					}
+					gen_symbol(val);
+				}
+			}
+
+			add_code(");\n");
+		} else if (using_space) {
+			Symbol& from = *opargsym (op, 1);
+
+			begin_code("");
+			gen_symbol(Result);
+			add_code(" = matrix_");
+			gen_symbol(from);
+			add_code("_to_common(");
+
+			if (nfloats == 1) {
+				Symbol& val = *opargsym (op, 2);
+				for (int i = 0; i < 16; ++i) {
+					if (i != 0) {
+						add_code(", ");
+					}
+					if ((i % 4) == (i / 4)) {
+						gen_symbol(val);
+					} else {
+						add_code("(float)0");
+					}
+				}
+			} else {
+				for (int i = 0; i < 16; ++i) {
+					Symbol& val = *opargsym (op, i + 2);
+					if (i != 0) {
+						add_code(", ");
+					}
+					gen_symbol(val);
+				}
+			}
+
+			add_code(");\n");
+		} else {
+			begin_code("");
+			gen_symbol(Result);
+			add_code(" = matrix(");
+
+			if (nfloats == 1) {
+				Symbol& val = *opargsym (op, 2);
+				for (int i = 0; i < 16; ++i) {
+					if (i != 0) {
+						add_code(", ");
+					}
+					if ((i % 4) == (i / 4)) {
+						gen_symbol(val);
+					} else {
+						add_code("(float)0");
+					}
+				}
+			} else {
+				for (int i = 0; i < 16; ++i) {
+					Symbol& val = *opargsym (op, i + 2);
+					if (i != 0) {
+						add_code(", ");
+					}
+					gen_symbol(val);
+				}
+			}
+
+			add_code(");\n");
+		}
+
 		return true;
 	}
 	else if (op.opname() == op_getmatrix)
