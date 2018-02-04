@@ -1400,6 +1400,21 @@ bool BackendGLSL::build_op(int opnum)
 	}
 	else if (op.opname() == op_getmatrix)
 	{
+		Symbol& Result = *opargsym (op, 0);
+		Symbol& From = *opargsym (op, 1);
+		Symbol& To = *opargsym (op, 2);
+		Symbol& M = *opargsym (op, 3);
+
+		begin_code("");
+		gen_symbol(Result);
+		add_code(" = getmatrix_");
+		gen_symbol(From);
+		add_code("_to_");
+		gen_symbol(To);
+		add_code("(");
+		gen_symbol(M);
+		add_code(");\n");
+
 		return true;
 	}
 	else if (
