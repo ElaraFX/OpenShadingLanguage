@@ -106,6 +106,7 @@ static ustring op_closure("closure");
 static ustring op_texture("texture");
 static ustring op_getattribute("getattribute");
 static ustring op_isconstant("isconstant");
+static ustring op_smoothstep("smoothstep");
 static ustring u_alpha("alpha");
 static ustring u_width("width");
 
@@ -1177,6 +1178,25 @@ bool BackendGLSL::build_op(int opnum)
 		} else {
 			add_code(" = 0;\n");
 		}
+
+		return true;
+	}
+	else if (op.opname() == op_smoothstep)
+	{
+		Symbol& result = *opargsym (op, 0);
+		Symbol& e0 = *opargsym (op, 1);
+		Symbol& e1 = *opargsym (op, 2);
+		Symbol& x = *opargsym (op, 3);
+
+		begin_code("");
+		gen_symbol(result);
+		add_code(" = smoothstep(");
+		gen_symbol(e0);
+		add_code(", ");
+		gen_symbol(e1);
+		add_code(", ");
+		gen_symbol(x);
+		add_code(");\n");
 
 		return true;
 	}
