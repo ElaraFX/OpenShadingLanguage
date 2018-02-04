@@ -105,6 +105,7 @@ static ustring op_pow("pow");
 static ustring op_closure("closure");
 static ustring op_texture("texture");
 static ustring op_getattribute("getattribute");
+static ustring op_isconstant("isconstant");
 static ustring u_alpha("alpha");
 static ustring u_width("width");
 
@@ -1161,6 +1162,21 @@ bool BackendGLSL::build_op(int opnum)
 		add_code(", ");
 		gen_symbol(Destination);
 		add_code(");\n");
+
+		return true;
+	}
+	else if (op.opname() == op_isconstant)
+	{
+		Symbol &Result (*opargsym (op, 0));
+		Symbol &A (*opargsym (op, 1));
+
+		begin_code("");
+		gen_symbol(Result);
+		if (A.is_constant()) {
+			add_code(" = 1;\n");
+		} else {
+			add_code(" = 0;\n");
+		}
 
 		return true;
 	}
