@@ -261,25 +261,34 @@ void BackendGLSL::pop_block()
 
 void BackendGLSL::push_function(Symbol & function_name)
 {
-	begin_code(Strutil::format("// FUNCTIONCALL_%d ", m_function_id));
+	int current_function_id = m_function_id;
+	begin_code(Strutil::format("// functioncall_%d ", current_function_id));
 	gen_symbol(function_name);
 	add_code("\n");
 
-	m_function_stack.push_back(m_function_id);
+	// Unfortunately, GLSL does not allow "goto" and label, so 
+	// we have to use do-while and returned mask.
+	begin_code("do\n");
+
+	m_function_stack.push_back(current_function_id);
 	++ m_function_id;
 
 	push_block();
+
+	begin_code(Strutil::format(
+		"bool functioncall_%d_returned = false;\n", 
+		current_function_id));
 }
 
 void BackendGLSL::pop_function()
 {
 	pop_block();
 
-	int last_function_id = m_function_stack.back();
 	m_function_stack.pop_back();
 
-	// TODO: Unfortunately, GLSL does not allow label
-	begin_code(Strutil::format("// FUNCTIONCALL_%d_AFTER_BLOCK:\n", last_function_id));
+	// Unfortunately, GLSL does not allow "goto" and label, so 
+	// we have to use do-while and returned mask
+	begin_code("while (false);\n");
 }
 
 void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & name)
@@ -571,6 +580,18 @@ bool BackendGLSL::build_op(int opnum)
 			pop_block();
 		}
 
+		// Unfortunately, GLSL does not allow "goto" and label, so 
+		// we have to use do-while and returned mask.
+		// Special handling for function return, jump to 
+		// the outside scope until we exit the function.
+		if (!m_function_stack.empty())
+		{
+			int current_function_id = m_function_stack.back();
+			begin_code(Strutil::format(
+				"if (functioncall_%d_returned) { break; }\n", 
+				current_function_id));
+		}
+
 		return true;
 	}
 	else if (
@@ -599,9 +620,12 @@ bool BackendGLSL::build_op(int opnum)
 			if (m_function_stack.empty()) {
 				begin_code("return;\n");
 			} else {
-				// TODO: Unfortunately, GLSL does not allow "goto"
+				// Unfortunately, GLSL does not allow "goto" and label, so 
+				// we have to use do-while and returned mask.
 				int current_function_id = m_function_stack.back();
-				begin_code(Strutil::format("// goto FUNCTIONCALL_%d_AFTER_BLOCK;\n", current_function_id));
+				begin_code(Strutil::format(
+					"functioncall_%d_returned = true; break;\n", 
+					current_function_id));
 			}
 		}
 
