@@ -975,7 +975,8 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(Result);
-		add_code(" = (");
+		// GLSL does not allow implicit bool to int cast
+		add_code(" = int(");
 		gen_symbol(A);
 
 		if (op.opname() == op_eq) {
