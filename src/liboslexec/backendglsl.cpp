@@ -145,6 +145,7 @@ static ustring u_maxdist("maxdist");
 std::string format_var(const std::string & name)
 {
 	std::string var = name;
+
 	for (size_t i = 0; i < var.length(); ++i) {
 		if (var[i] == ' ' || 
 			var[i] == '-' || 
@@ -153,6 +154,18 @@ std::string format_var(const std::string & name)
 			var[i] = '_';
 		}
 	}
+
+	// GLSL does not allow "__", replace that
+	const std::string src("__");
+	const std::string dst("_");
+
+	std::string::size_type pos;
+
+	while ((pos = var.find(src)) != std::string::npos)
+	{
+		var.replace(pos, src.length(), dst);
+	}
+
 	return var;
 }
 
@@ -265,7 +278,8 @@ void BackendGLSL::pop_function()
 	int last_function_id = m_function_stack.back();
 	m_function_stack.pop_back();
 
-	begin_code(Strutil::format("FUNCTIONCALL_%d_AFTER_BLOCK:\n", last_function_id));
+	// TODO: Unfortunately, GLSL does not allow label
+	begin_code(Strutil::format("// FUNCTIONCALL_%d_AFTER_BLOCK:\n", last_function_id));
 }
 
 void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & name)
@@ -459,9 +473,10 @@ bool BackendGLSL::build_op(int opnum)
 	{
 		Symbol & cond = *opargsym(op, 0);
 
+		// GLSL does not allow implicit cast from int to bool
 		begin_code("if (");
 		gen_symbol(cond);
-		add_code(")\n");
+		add_code(" != 0)\n");
 
 		push_block();
 
@@ -526,9 +541,10 @@ bool BackendGLSL::build_op(int opnum)
 			pop_block();
 
 			// Test condition
+			// GLSL does not allow implicit cast from int to bool
 			begin_code("while (");
 			gen_symbol(cond);
-			add_code(");\n");
+			add_code(" != 0);\n");
 		}
 		else
 		{
@@ -536,9 +552,10 @@ bool BackendGLSL::build_op(int opnum)
 			build_block (op.jump(0), op.jump(1));
 
 			// Test condition
+			// GLSL does not allow implicit cast from int to bool
 			begin_code("while (");
 			gen_symbol(cond);
-			add_code(")\n");
+			add_code(" != 0)\n");
 
 			push_block();
 
@@ -582,8 +599,9 @@ bool BackendGLSL::build_op(int opnum)
 			if (m_function_stack.empty()) {
 				begin_code("return;\n");
 			} else {
+				// TODO: Unfortunately, GLSL does not allow "goto"
 				int current_function_id = m_function_stack.back();
-				begin_code(Strutil::format("goto FUNCTIONCALL_%d_AFTER_BLOCK;\n", current_function_id));
+				begin_code(Strutil::format("// goto FUNCTIONCALL_%d_AFTER_BLOCK;\n", current_function_id));
 			}
 		}
 
@@ -1900,14 +1918,24 @@ void BackendGLSL::assign_zero(const Symbol & sym)
 		mangled_name = "sg." + mangled_name;
 	}
 
+	bool is_closure_based = sym.typespec().is_closure_based();
+
 	if (!sym.typespec().is_array()) {
 		begin_code(mangled_name);
-		add_code(" = 0;\n");
+		if (is_closure_based) {
+			add_code(" = closure_color(0);\n");
+		} else {
+			add_code(" = 0;\n");
+		}
 	} else {
 		int arraylen = sym.typespec().arraylength();
 		for (int a = 0; a < arraylen; ++a) {
 			begin_code(mangled_name);
-			add_code(Strutil::format("[%d] = 0;\n", a));
+			if (is_closure_based) {
+				add_code(Strutil::format("[%d] = closure_color(0);\n", a));
+			} else {
+				add_code(Strutil::format("[%d] = 0;\n", a));
+			}
 		}
 	}
 }
@@ -2142,12 +2170,12 @@ void BackendGLSL::build_init()
 
 				if (!sym.typespec().is_array()) {
 					begin_code(mangled_name);
-					add_code(" = 0;\n");
+					add_code(" = closure_color(0);\n");
 				} else {
 					int arraylen = sym.typespec().arraylength();
 					for (int a = 0; a < arraylen; ++a) {
 						begin_code(mangled_name);
-						add_code(Strutil::format("[%d] = 0;\n", a));
+						add_code(Strutil::format("[%d] = closure_color(0);\n", a));
 					}
 				}
             }
@@ -2199,9 +2227,6 @@ void BackendGLSL::run()
 {
 	reset_code();
 
-	// Include all built-in ops here
-	begin_code("#include <stdosl_glsl.h>\n");
-
 	// Set up m_num_used_layers to be the number of layers that are
     // actually used, and m_layer_remap[] to map original layer numbers
     // to the shorter list of actually-called layers. We also note that
@@ -2235,6 +2260,10 @@ void BackendGLSL::run()
         }
     }
 
+	begin_code("void osl_main(ShaderGlobalsRef sg)\n");
+	push_block();
+	begin_code("GroupData groupdata;\n");
+
 	// Force the JIT to happen now and retrieve the JITed function pointers
     // for the initialization and all public entry points.
 	std::string init_func_name = Strutil::format("group_%d_init", group().id());
@@ -2252,6 +2281,8 @@ void BackendGLSL::run()
 			}
 		}
     }
+
+	pop_block();
 }
 
 
