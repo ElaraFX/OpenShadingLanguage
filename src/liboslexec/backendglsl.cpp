@@ -314,7 +314,7 @@ void BackendGLSL::gen_data(const Symbol *dealiased)
 		if (t.basetype == TypeDesc::FLOAT) {
 			for (int j = 0; j < t.aggregate; ++j) {
 				add_code((j != 0) ? ", " : "");
-				add_code(format_float(Strutil::format("(float)%.9f", ((float *)dealiased->data())[j])));
+				add_code(format_float(Strutil::format("float(%.9f)", ((float *)dealiased->data())[j])));
 			}
 		} else if (t.basetype == TypeDesc::INT) {
 			for (int j = 0; j < t.aggregate; ++j) {
@@ -348,7 +348,7 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 	{
 		std::string unique_layer_name = Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id());
 
-		mangled_name = "groupdata." + unique_layer_name + "__" + mangled_name;
+		mangled_name = "groupdata." + unique_layer_name + "_" + mangled_name;
 	}
 	else if (sym.symtype() == SymTypeGlobal)
 	{
@@ -1133,7 +1133,7 @@ bool BackendGLSL::build_op(int opnum)
 		if (width != NULL) {
 			gen_symbol(*width);
 		} else {
-			add_code("(float)1.0");
+			add_code("float(1.0)");
 		}
 
 		if (alpha != NULL) {
@@ -1319,7 +1319,7 @@ bool BackendGLSL::build_op(int opnum)
 					if ((i % 4) == (i / 4)) {
 						gen_symbol(val);
 					} else {
-						add_code("(float)0");
+						add_code("float(0.0)");
 					}
 				}
 			} else {
@@ -1351,7 +1351,7 @@ bool BackendGLSL::build_op(int opnum)
 					if ((i % 4) == (i / 4)) {
 						gen_symbol(val);
 					} else {
-						add_code("(float)0");
+						add_code("float(0.0)");
 					}
 				}
 			} else {
@@ -1379,7 +1379,7 @@ bool BackendGLSL::build_op(int opnum)
 					if ((i % 4) == (i / 4)) {
 						gen_symbol(val);
 					} else {
-						add_code("(float)0");
+						add_code("float(0.0)");
 					}
 				}
 			} else {
@@ -1553,7 +1553,7 @@ bool BackendGLSL::build_op(int opnum)
 		if (width != NULL) {
 			gen_symbol(*width);
 		} else {
-			add_code("(float)1.0");
+			add_code("float(1.0)");
 		}
 
 		if (alpha != NULL) {
@@ -1602,13 +1602,13 @@ bool BackendGLSL::build_op(int opnum)
 		if (mindist != NULL) {
 			gen_symbol(*mindist);
 		} else {
-			add_code("(float)1.0e-5");
+			add_code("float(1.0e-5)");
 		}
 		add_code(", ");
 		if (maxdist != NULL) {
 			gen_symbol(*maxdist);
 		} else {
-			add_code("(float)1.0e+30");
+			add_code("float(1.0e+30)");
 		}
 		add_code(");\n");
 
@@ -1956,7 +1956,7 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 			{
 				std::string unique_layer_name = format_var(Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id()));
 
-				mangled_name = "groupdata." + unique_layer_name + "__" + mangled_name;
+				mangled_name = "groupdata." + unique_layer_name + "_" + mangled_name;
 			}
 			else if (sym.symtype() == SymTypeGlobal)
 			{
@@ -1984,7 +1984,7 @@ bool BackendGLSL::build_instance(bool groupentry)
 		begin_code("void ");
 	}
 	add_code(unique_layer_name);
-	add_code("(ShaderGlobals & sg, GroupData & groupdata)\n");
+	add_code("(ShaderGlobalsRef sg, GroupDataRef groupdata)\n");
 	push_block();
 
 	//llvm::Value *layerfield = layer_run_ref(m_layer_remap[layer()]);
@@ -2086,10 +2086,10 @@ bool BackendGLSL::build_instance(bool groupentry)
                 // FIXME -- I'm not sure I understand this.  Isn't this
                 // unnecessary if we wrote to the parameter ourself?
 				Symbol* dst_dealiased = dstsym->dealias();
-				std::string dst_mangled = "groupdata." + dst_layer_name + "__" + dst_dealiased->mangled();
+				std::string dst_mangled = "groupdata." + dst_layer_name + "_" + dst_dealiased->mangled();
 
 				Symbol* src_dealiased = srcsym->dealias();
-				std::string src_mangled = "groupdata." + unique_layer_name + "__" + src_dealiased->mangled();
+				std::string src_mangled = "groupdata." + unique_layer_name + "_" + src_dealiased->mangled();
 
 				begin_code(format_var(dst_mangled));
 				add_code(" = ");
@@ -2112,7 +2112,7 @@ void BackendGLSL::build_init()
 
 	begin_code("void ");
 	add_code(unique_name);
-	add_code("(ShaderGlobals & sg, GroupData & groupdata)\n");
+	add_code("(ShaderGlobalsRef sg, GroupDataRef groupdata)\n");
 	push_block();
 
     // Group init clears all the "layer_run" and "userdata_initialized" flags.
@@ -2138,7 +2138,7 @@ void BackendGLSL::build_init()
         FOREACH_PARAM (Symbol &sym, gi) {
 			if (sym.typespec().is_closure_based()) {
 				Symbol* dealiased = sym.dealias();
-				std::string mangled_name = format_var("groupdata." + unique_layer_name + "__" + dealiased->mangled());
+				std::string mangled_name = format_var("groupdata." + unique_layer_name + "_" + dealiased->mangled());
 
 				if (!sym.typespec().is_array()) {
 					begin_code(mangled_name);
@@ -2182,7 +2182,7 @@ void BackendGLSL::type_groupdata()
 			Symbol *dealiased = sym.dealias();
 			
 			// Don't need "groupdata." prefix inside struct definition
-			std::string mangled_name = unique_layer_name + "__" + dealiased->mangled();
+			std::string mangled_name = unique_layer_name + "_" + dealiased->mangled();
 			
 			gen_typespec(dealiased->typespec(), mangled_name);
         }
