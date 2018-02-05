@@ -663,6 +663,7 @@ bool BackendGLSL::build_op(int opnum)
 		Symbol & src = *opargsym(op, 1);
 
 		bool to_closure = (result.typespec().is_closure() && 
+			!src.typespec().is_closure_based() && 
 			(src.typespec().is_int() || src.typespec().is_float()));
 
 		begin_code("");
@@ -824,6 +825,7 @@ bool BackendGLSL::build_op(int opnum)
 		Symbol& Index = *opargsym (op, 2);
 
 		bool to_closure = (Result.typespec().is_closure() && 
+			!Val.typespec().is_closure_based() && 
 			(Val.typespec().is_int_based() || Val.typespec().is_float_based()));
 
 		begin_code("");
@@ -852,6 +854,7 @@ bool BackendGLSL::build_op(int opnum)
 		Symbol& Val = *opargsym (op, 2);
 
 		bool to_closure = (Result.typespec().is_closure_based() && 
+			!Val.typespec().is_closure_based() && 
 			(Val.typespec().is_int() || Val.typespec().is_float()));
 
 		begin_code("");
@@ -878,6 +881,7 @@ bool BackendGLSL::build_op(int opnum)
 		Symbol& Col = *opargsym (op, 3);
 
 		bool to_closure = (Result.typespec().is_closure() && 
+			!M.typespec().is_closure_based() && 
 			(M.typespec().is_int_based() || M.typespec().is_float_based()));
 
 		begin_code("");
