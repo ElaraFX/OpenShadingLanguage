@@ -323,6 +323,7 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
 void BackendGLSL::gen_data(const Symbol *dealiased)
 {
 	TypeDesc t = dealiased->typespec().simpletype();
+	bool is_closure_based = dealiased->typespec().is_closure_based();
 	if (t.is_array()) {
 		add_code("{");
 	}
@@ -351,6 +352,8 @@ void BackendGLSL::gen_data(const Symbol *dealiased)
 				add_code(Strutil::escape_chars(((ustring *)dealiased->data())[j].string()));
 				add_code("\"");
 			}
+		} else {
+			shadingcontext()->error("Unsupported symbol data type %d\n", (int)t.basetype);
 		}
 		if (t.aggregate != 1) {
 			add_code(")");
@@ -659,15 +662,24 @@ bool BackendGLSL::build_op(int opnum)
 		Symbol & result = *opargsym(op, 0);
 		Symbol & src = *opargsym(op, 1);
 
+		bool to_closure = (result.typespec().is_closure() && 
+			(src.typespec().is_int() || src.typespec().is_float()));
+
 		begin_code("");
 		gen_symbol(result);
 		add_code(" = ");
+		if (to_closure) {
+			add_code("closure_color(");
+		}
 		if (op.opname() == op_neg) {
 			add_code("- ");
 		} else if (op.opname() == op_compl) {
 			add_code("~ ");
 		}
 		gen_symbol(src);
+		if (to_closure) {
+			add_code(")");
+		}
 		add_code(";\n");
 
 		return true;
@@ -811,13 +823,23 @@ bool BackendGLSL::build_op(int opnum)
 		Symbol& Val = *opargsym (op, 1);
 		Symbol& Index = *opargsym (op, 2);
 
+		bool to_closure = (Result.typespec().is_closure() && 
+			(Val.typespec().is_int_based() || Val.typespec().is_float_based()));
+
 		begin_code("");
 		gen_symbol(Result);
 		add_code(" = ");
+		if (to_closure) {
+			add_code("closure_color(");
+		}
 		gen_symbol(Val);
 		add_code("[");
 		gen_symbol(Index);
-		add_code("];\n");
+		add_code("]");
+		if (to_closure) {
+			add_code(")");
+		}
+		add_code(";\n");
 
 		return true;
 	}
@@ -829,12 +851,21 @@ bool BackendGLSL::build_op(int opnum)
 		Symbol& Index = *opargsym (op, 1);
 		Symbol& Val = *opargsym (op, 2);
 
+		bool to_closure = (Result.typespec().is_closure_based() && 
+			(Val.typespec().is_int() || Val.typespec().is_float()));
+
 		begin_code("");
 		gen_symbol(Result);
 		add_code("[");
 		gen_symbol(Index);
 		add_code("] = ");
+		if (to_closure) {
+			add_code("closure_color(");
+		}
 		gen_symbol(Val);
+		if (to_closure) {
+			add_code(")");
+		}
 		add_code(";\n");
 
 		return true;
@@ -846,15 +877,25 @@ bool BackendGLSL::build_op(int opnum)
 		Symbol& Row = *opargsym (op, 2);
 		Symbol& Col = *opargsym (op, 3);
 
+		bool to_closure = (Result.typespec().is_closure() && 
+			(M.typespec().is_int_based() || M.typespec().is_float_based()));
+
 		begin_code("");
 		gen_symbol(Result);
 		add_code(" = ");
+		if (to_closure) {
+			add_code("closure_color(");
+		}
 		gen_symbol(M);
 		add_code("[");
 		gen_symbol(Row);
 		add_code("][");
 		gen_symbol(Col);
-		add_code("];\n");
+		add_code("]");
+		if (to_closure) {
+			add_code(")");
+		}
+		add_code(";\n");
 
 		return true;
 	}
@@ -1727,7 +1768,7 @@ bool BackendGLSL::build_op(int opnum)
 			pass_name = true;
 			name = periodic ? Strings::gaborpnoise : Strings::gabornoise;
 		} else {
-			shadingcontext()->error ("%snoise type \"%s\" is unknown, called from (%s:%d)",
+			shadingcontext()->error ("%snoise type \"%s\" is unknown, called from (%s:%d)\n",
 									(periodic ? "periodic " : ""), name.c_str(),
 									op.sourcefile().c_str(), op.sourceline());
 			return false;
