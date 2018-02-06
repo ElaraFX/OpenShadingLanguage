@@ -666,11 +666,18 @@ bool BackendGLSL::build_op(int opnum)
 			!src.typespec().is_closure_based() && 
 			(src.typespec().is_int() || src.typespec().is_float()));
 
+		bool to_int = (!result.typespec().is_closure() && 
+			result.typespec().is_int() && 
+			!src.typespec().is_closure() && 
+			src.typespec().is_float());
+
 		begin_code("");
 		gen_symbol(result);
 		add_code(" = ");
 		if (to_closure) {
 			add_code("closure_color(");
+		} else if (to_int) {
+			add_code("int(");
 		}
 		if (op.opname() == op_neg) {
 			add_code("- ");
@@ -678,7 +685,7 @@ bool BackendGLSL::build_op(int opnum)
 			add_code("~ ");
 		}
 		gen_symbol(src);
-		if (to_closure) {
+		if (to_closure || to_int) {
 			add_code(")");
 		}
 		add_code(";\n");
@@ -828,17 +835,24 @@ bool BackendGLSL::build_op(int opnum)
 			!Val.typespec().is_closure_based() && 
 			(Val.typespec().is_int_based() || Val.typespec().is_float_based()));
 
+		bool to_int = (!Result.typespec().is_closure() && 
+			Result.typespec().is_int() && 
+			!Val.typespec().is_closure_based() && 
+			Val.typespec().is_float_based());
+
 		begin_code("");
 		gen_symbol(Result);
 		add_code(" = ");
 		if (to_closure) {
 			add_code("closure_color(");
+		} else if (to_int) {
+			add_code("int(");
 		}
 		gen_symbol(Val);
 		add_code("[");
 		gen_symbol(Index);
 		add_code("]");
-		if (to_closure) {
+		if (to_closure || to_int) {
 			add_code(")");
 		}
 		add_code(";\n");
@@ -857,6 +871,11 @@ bool BackendGLSL::build_op(int opnum)
 			!Val.typespec().is_closure_based() && 
 			(Val.typespec().is_int() || Val.typespec().is_float()));
 
+		bool to_int = (!Result.typespec().is_closure_based() && 
+			Result.typespec().is_int_based() && 
+			!Val.typespec().is_closure() && 
+			Val.typespec().is_float());
+
 		begin_code("");
 		gen_symbol(Result);
 		add_code("[");
@@ -864,9 +883,11 @@ bool BackendGLSL::build_op(int opnum)
 		add_code("] = ");
 		if (to_closure) {
 			add_code("closure_color(");
+		} else if (to_int) {
+			add_code("int(");
 		}
 		gen_symbol(Val);
-		if (to_closure) {
+		if (to_closure || to_int) {
 			add_code(")");
 		}
 		add_code(";\n");
@@ -884,11 +905,18 @@ bool BackendGLSL::build_op(int opnum)
 			!M.typespec().is_closure_based() && 
 			(M.typespec().is_int_based() || M.typespec().is_float_based()));
 
+		bool to_int = (!Result.typespec().is_closure() && 
+			Result.typespec().is_int() && 
+			!M.typespec().is_closure_based() && 
+			M.typespec().is_float_based());
+
 		begin_code("");
 		gen_symbol(Result);
 		add_code(" = ");
 		if (to_closure) {
 			add_code("closure_color(");
+		} else if (to_int) {
+			add_code("int(");
 		}
 		gen_symbol(M);
 		add_code("[");
@@ -896,7 +924,7 @@ bool BackendGLSL::build_op(int opnum)
 		add_code("][");
 		gen_symbol(Col);
 		add_code("]");
-		if (to_closure) {
+		if (to_closure || to_int) {
 			add_code(")");
 		}
 		add_code(";\n");
