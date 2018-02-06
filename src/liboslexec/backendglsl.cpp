@@ -1088,11 +1088,11 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(result);
 
 		if (op.opname() == op_Dx) {
-			add_code(" = Dx(sg, ");
+			add_code(" = Dx(");
 		} else if (op.opname() == op_Dy) {
-			add_code(" = Dy(sg, ");
+			add_code(" = Dy(");
 		} else {
-			add_code(" = Dz(sg, ");
+			add_code(" = Dz(");
 		}
 
 		gen_symbol(src);
