@@ -1243,7 +1243,7 @@ bool BackendGLSL::build_op(int opnum)
 			add_code(" = texture_rgb(sg, ");
 		}
 		// Use hash to make string into constants
-		add_code(Strutil::format("%u, ", 
+		add_code(Strutil::format("%uU, ", 
 			Filename.is_constant() ? 
 			(unsigned int)(Filename.get_string().hash()) : 0U));
 		gen_symbol(S);
@@ -1287,7 +1287,7 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(Result);
 		add_code(" = getattribute(sg, ");
 		if (object_lookup) {
-			add_code(Strutil::format("%u, ", 
+			add_code(Strutil::format("%uU, ", 
 				ObjectName.is_constant() ? 
 				(unsigned int)ObjectName.get_string().hash() : 0U));
 		} else {
@@ -1295,7 +1295,7 @@ bool BackendGLSL::build_op(int opnum)
 		}
 		add_code(Strutil::format("%s, ", 
 			Attribute.is_constant() ? 
-			Attribute.get_string().c_str() : "0"));
+			Attribute.get_string().c_str() : "0U"));
 		if (array_lookup) {
 			add_code("true, ");
 		} else {
