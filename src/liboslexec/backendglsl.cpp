@@ -1237,9 +1237,15 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(Result);
-		add_code(" = texture(sg, ");
-		gen_symbol(Filename);
-		add_code(", ");
+		if (alpha != NULL) {
+			add_code(" = texture_alpha(sg, ");
+		} else {
+			add_code(" = texture(sg, ");
+		}
+		// Use hash to make string into constants
+		add_code(Strutil::format("%u, ", 
+			Filename.is_constant() ? 
+			(unsigned int)(Filename.get_string().hash()) : 0U));
 		gen_symbol(S);
 		add_code(", ");
 		gen_symbol(T);
@@ -1281,16 +1287,19 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(Result);
 		add_code(" = getattribute(sg, ");
 		if (object_lookup) {
-			gen_symbol(ObjectName);
+			add_code(Strutil::format("%u, ", 
+				ObjectName.is_constant() ? 
+				(unsigned int)ObjectName.get_string().hash() : 0U));
 		} else {
-			add_code("");
+			add_code("0, ");
 		}
-		add_code(", ");
-		gen_symbol(Attribute);
+		add_code(Strutil::format("%s, ", 
+			Attribute.is_constant() ? 
+			Attribute.get_string().c_str() : "0"));
 		if (array_lookup) {
-			add_code(", true, ");
+			add_code("true, ");
 		} else {
-			add_code(", false, ");
+			add_code("false, ");
 		}
 		gen_symbol(Index);
 		add_code(", ");
