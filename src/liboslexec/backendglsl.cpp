@@ -1238,9 +1238,9 @@ bool BackendGLSL::build_op(int opnum)
 		begin_code("");
 		gen_symbol(Result);
 		if (alpha != NULL) {
-			add_code(" = texture_alpha(sg, ");
+			add_code(" = texture_rgba(sg, ");
 		} else {
-			add_code(" = texture(sg, ");
+			add_code(" = texture_rgb(sg, ");
 		}
 		// Use hash to make string into constants
 		add_code(Strutil::format("%u, ", 
