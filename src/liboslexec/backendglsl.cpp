@@ -1291,7 +1291,7 @@ bool BackendGLSL::build_op(int opnum)
 				ObjectName.is_constant() ? 
 				(unsigned int)ObjectName.get_string().hash() : 0U));
 		} else {
-			add_code("0, ");
+			add_code("0U, ");
 		}
 		add_code(Strutil::format("%s, ", 
 			Attribute.is_constant() ? 
