@@ -1243,7 +1243,7 @@ bool BackendGLSL::build_op(int opnum)
 			add_code(" = texture_rgb(sg, ");
 		}
 		// Use hash to make string into constants
-		add_code(Strutil::format("%uU, ", 
+		add_code(Strutil::format("texSampler_%u, ", 
 			Filename.is_constant() ? 
 			(unsigned int)(Filename.get_string().hash()) : 0U));
 		gen_symbol(S);
