@@ -44,6 +44,24 @@ SOURCE_GROUP("SDK" FILES ${include_src})
 SOURCE_GROUP("minizip" FILES ${minizip_h_src} ${minizip_c_src})
 SOURCE_GROUP("OpenCL" FILES ${ocl_h_src} ${ocl_c_src})
 
+MACRO ( CL_COMPILE cl_src srclist )
+    GET_FILENAME_COMPONENT ( clsrc_we ${cl_src} NAME_WE )
+    SET ( clsrc_cpp "${CMAKE_CURRENT_BINARY_DIR}/${clsrc_we}.cl.cpp" )
+    SET ( ${srclist} ${${srclist}} ${clsrc_cpp} )
+
+	MESSAGE (STATUS "CL_COMPILE in=${cl_src}")
+	MESSAGE (STATUS "CL_COMPILE out=${clsrc_cpp}")
+	MESSAGE (STATUS "CL_COMPILE module=${clsrc_we}")
+
+    ADD_CUSTOM_COMMAND ( OUTPUT ${clsrc_cpp}
+      COMMAND "git-bash" ${CMAKE_CURRENT_SOURCE_DIR}/serialize-cl-win.bash ${cl_src} ${clsrc_cpp} ${clsrc_we}
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" )
+ENDMACRO ()
+
+foreach (ocl_c ${ocl_c_src})
+    CL_COMPILE ("${ocl_c}" cpp_src)
+endforeach ()
+
 ADD_LIBRARY (liber SHARED ${h_src} ${cpp_src} ${include_src} ${minizip_h_src} ${minizip_c_src} ${ocl_h_src} ${ocl_c_src})
 SET_TARGET_PROPERTIES (liber PROPERTIES INTERFACE_LINK_LIBRARIES "")
 ADD_DEFINITIONS (-DeiCORE_EXPORTS)
