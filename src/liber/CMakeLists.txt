@@ -55,6 +55,8 @@ MACRO ( CL_COMPILE cl_src srclist )
 
     ADD_CUSTOM_COMMAND ( OUTPUT ${clsrc_cpp}
       COMMAND "git-bash" ${CMAKE_CURRENT_SOURCE_DIR}/serialize-cl-win.bash ${cl_src} ${clsrc_cpp} ${clsrc_we}
+      MAIN_DEPENDENCY ${cl_src}
+      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/serialize-cl-win.bash"
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" )
 ENDMACRO ()
 
