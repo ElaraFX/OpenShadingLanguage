@@ -382,11 +382,25 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 	{
 		std::string unique_layer_name = Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id());
 
-		mangled_name = "groupdata." + unique_layer_name + "_" + mangled_name;
+		if (!m_OpenCL)
+		{
+			mangled_name = "groupdata." + unique_layer_name + "_" + mangled_name;
+		}
+		else
+		{
+			mangled_name = "groupdata->" + unique_layer_name + "_" + mangled_name;
+		}
 	}
 	else if (sym.symtype() == SymTypeGlobal)
 	{
-		mangled_name = "sg." + mangled_name;
+		if (!m_OpenCL)
+		{
+			mangled_name = "sg." + mangled_name;
+		}
+		else
+		{
+			mangled_name = "sg->" + mangled_name;
+		}
 	}
 
 	if (dealiased->is_constant() && dealiased->data() != NULL)
@@ -683,9 +697,23 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(result);
 		add_code(" = ");
 		if (to_closure) {
-			add_code("closure_color(");
+			if (!m_OpenCL)
+			{
+				add_code("closure_color(");
+			}
+			else
+			{
+				add_code("(closure_color)(");
+			}
 		} else if (to_int) {
-			add_code("int(");
+			if (!m_OpenCL)
+			{
+				add_code("int(");
+			}
+			else
+			{
+				add_code("(int)(");
+			}
 		}
 		if (op.opname() == op_neg) {
 			add_code("- ");
@@ -819,7 +847,14 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(Result);
-		add_code(" = (1.0 - ");
+		if (!m_OpenCL)
+		{
+			add_code(" = (float(1.0) - ");
+		}
+		else
+		{
+			add_code(" = (1.0f - ");
+		}
 		gen_symbol(X);
 		add_code(") * ");
 		gen_symbol(A);
@@ -852,9 +887,23 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(Result);
 		add_code(" = ");
 		if (to_closure) {
-			add_code("closure_color(");
+			if (!m_OpenCL)
+			{
+				add_code("closure_color(");
+			}
+			else
+			{
+				add_code("(closure_color)(");
+			}
 		} else if (to_int) {
-			add_code("int(");
+			if (!m_OpenCL)
+			{
+				add_code("int(");
+			}
+			else
+			{
+				add_code("(int)(");
+			}
 		}
 		gen_symbol(Val);
 		add_code("[");
@@ -890,9 +939,23 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(Index);
 		add_code("] = ");
 		if (to_closure) {
-			add_code("closure_color(");
+			if (!m_OpenCL)
+			{
+				add_code("closure_color(");
+			}
+			else
+			{
+				add_code("(closure_color)(");
+			}
 		} else if (to_int) {
-			add_code("int(");
+			if (!m_OpenCL)
+			{
+				add_code("int(");
+			}
+			else
+			{
+				add_code("(int)(");
+			}
 		}
 		gen_symbol(Val);
 		if (to_closure || to_int) {
@@ -922,9 +985,23 @@ bool BackendGLSL::build_op(int opnum)
 		gen_symbol(Result);
 		add_code(" = ");
 		if (to_closure) {
-			add_code("closure_color(");
+			if (!m_OpenCL)
+			{
+				add_code("closure_color(");
+			}
+			else
+			{
+				add_code("(closure_color)(");
+			}
 		} else if (to_int) {
-			add_code("int(");
+			if (!m_OpenCL)
+			{
+				add_code("int(");
+			}
+			else
+			{
+				add_code("(int)(");
+			}
 		}
 		gen_symbol(M);
 		add_code("[");
@@ -1012,7 +1089,14 @@ bool BackendGLSL::build_op(int opnum)
 		begin_code("");
 		gen_symbol(Result);
 		// GLSL does not allow implicit bool to int cast
-		add_code(" = int(");
+		if (!m_OpenCL)
+		{
+			add_code(" = int(");
+		}
+		else
+		{
+			add_code(" = (int)(");
+		}
 		gen_symbol(A);
 
 		if (op.opname() == op_eq) {
@@ -1263,7 +1347,14 @@ bool BackendGLSL::build_op(int opnum)
 		if (width != NULL) {
 			gen_symbol(*width);
 		} else {
-			add_code("float(1.0)");
+			if (!m_OpenCL)
+			{
+				add_code("float(1.0)");
+			}
+			else
+			{
+				add_code("1.0f");
+			}
 		}
 
 		if (alpha != NULL) {
@@ -1364,7 +1455,14 @@ bool BackendGLSL::build_op(int opnum)
 			gen_symbol(Result);
 			add_code(" = ");
 			gen_symbol(Space);
-			add_code("_to_rgb(color(");
+			if (!m_OpenCL)
+			{
+				add_code("_to_rgb(color(");
+			}
+			else
+			{
+				add_code("_to_rgb((color)(");
+			}
 			gen_symbol(X);
 			add_code(", ");
 			gen_symbol(Y);
@@ -1374,7 +1472,14 @@ bool BackendGLSL::build_op(int opnum)
 		} else {
 			begin_code("");
 			gen_symbol(Result);
-			add_code(" = color(");
+			if (!m_OpenCL)
+			{
+				add_code(" = color(");
+			}
+			else
+			{
+				add_code(" = (color)(");
+			}
 			gen_symbol(X);
 			add_code(", ");
 			gen_symbol(Y);
@@ -1402,7 +1507,14 @@ bool BackendGLSL::build_op(int opnum)
 			gen_symbol(Result);
 			add_code(" = ");
 			gen_symbol(Space);
-			add_code(Strutil::format("_to_common(%s(", op.opname().c_str()));
+			if (!m_OpenCL)
+			{
+				add_code(Strutil::format("_to_common(%s(", op.opname().c_str()));
+			}
+			else
+			{
+				add_code(Strutil::format("_to_common((%s)(", op.opname().c_str()));
+			}
 			gen_symbol(X);
 			add_code(", ");
 			gen_symbol(Y);
@@ -1412,7 +1524,14 @@ bool BackendGLSL::build_op(int opnum)
 		} else {
 			begin_code("");
 			gen_symbol(Result);
-			add_code(Strutil::format(" = %s(", op.opname().c_str()));
+			if (!m_OpenCL)
+			{
+				add_code(Strutil::format(" = %s(", op.opname().c_str()));
+			}
+			else
+			{
+				add_code(Strutil::format(" = (%s)(", op.opname().c_str()));
+			}
 			gen_symbol(X);
 			add_code(", ");
 			gen_symbol(Y);
@@ -1452,7 +1571,14 @@ bool BackendGLSL::build_op(int opnum)
 					if ((i % 4) == (i / 4)) {
 						gen_symbol(val);
 					} else {
-						add_code("float(0.0)");
+						if (!m_OpenCL)
+						{
+							add_code("float(0.0)");
+						}
+						else
+						{
+							add_code("0.0f");
+						}
 					}
 				}
 			} else {
@@ -1484,7 +1610,14 @@ bool BackendGLSL::build_op(int opnum)
 					if ((i % 4) == (i / 4)) {
 						gen_symbol(val);
 					} else {
-						add_code("float(0.0)");
+						if (!m_OpenCL)
+						{
+							add_code("float(0.0)");
+						}
+						else
+						{
+							add_code("0.0f");
+						}
 					}
 				}
 			} else {
@@ -1501,7 +1634,14 @@ bool BackendGLSL::build_op(int opnum)
 		} else {
 			begin_code("");
 			gen_symbol(Result);
-			add_code(" = matrix(");
+			if (!m_OpenCL)
+			{
+				add_code(" = matrix(");
+			}
+			else
+			{
+				add_code(" = (matrix)(");
+			}
 
 			if (nfloats == 1) {
 				Symbol& val = *opargsym (op, 2);
@@ -1512,7 +1652,14 @@ bool BackendGLSL::build_op(int opnum)
 					if ((i % 4) == (i / 4)) {
 						gen_symbol(val);
 					} else {
-						add_code("float(0.0)");
+						if (!m_OpenCL)
+						{
+							add_code("float(0.0)");
+						}
+						else
+						{
+							add_code("0.0f");
+						}
 					}
 				}
 			} else {
@@ -1686,7 +1833,14 @@ bool BackendGLSL::build_op(int opnum)
 		if (width != NULL) {
 			gen_symbol(*width);
 		} else {
-			add_code("float(1.0)");
+			if (!m_OpenCL)
+			{
+				add_code("float(1.0)");
+			}
+			else
+			{
+				add_code("1.0f");
+			}
 		}
 
 		if (alpha != NULL) {
@@ -1735,13 +1889,27 @@ bool BackendGLSL::build_op(int opnum)
 		if (mindist != NULL) {
 			gen_symbol(*mindist);
 		} else {
-			add_code("float(1.0e-5)");
+			if (!m_OpenCL)
+			{
+				add_code("float(1.0e-5)");
+			}
+			else
+			{
+				add_code("1.0e-5f");
+			}
 		}
 		add_code(", ");
 		if (maxdist != NULL) {
 			gen_symbol(*maxdist);
 		} else {
-			add_code("float(1.0e+30)");
+			if (!m_OpenCL)
+			{
+				add_code("float(1.0e+30)");
+			}
+			else
+			{
+				add_code("1.0e+30f");
+			}
 		}
 		add_code(");\n");
 
@@ -1947,7 +2115,14 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(Result);
-		add_code(Strutil::format(" = sg.%s;\n", op.opname().c_str()));
+		if (!m_OpenCL)
+		{
+			add_code(Strutil::format(" = sg.%s;\n", op.opname().c_str()));
+		}
+		else
+		{
+			add_code(Strutil::format(" = sg->%s;\n", op.opname().c_str()));
+		}
 
 		return true;
 	}
@@ -2030,7 +2205,14 @@ void BackendGLSL::assign_zero(const Symbol & sym)
 
 	if (sym.symtype() == SymTypeGlobal)
 	{
-		mangled_name = "sg." + mangled_name;
+		if (!m_OpenCL)
+		{
+			mangled_name = "sg." + mangled_name;
+		}
+		else
+		{
+			mangled_name = "sg->" + mangled_name;
+		}
 	}
 
 	bool is_closure_based = sym.typespec().is_closure_based();
@@ -2038,7 +2220,14 @@ void BackendGLSL::assign_zero(const Symbol & sym)
 	if (!sym.typespec().is_array()) {
 		begin_code(mangled_name);
 		if (is_closure_based) {
-			add_code(" = closure_color(0);\n");
+			if (!m_OpenCL)
+			{
+				add_code(" = closure_color(0);\n");
+			}
+			else
+			{
+				add_code(" = (closure_color)(0);\n");
+			}
 		} else {
 			add_code(" = 0;\n");
 		}
@@ -2047,7 +2236,14 @@ void BackendGLSL::assign_zero(const Symbol & sym)
 		for (int a = 0; a < arraylen; ++a) {
 			begin_code(mangled_name);
 			if (is_closure_based) {
-				add_code(Strutil::format("[%d] = closure_color(0);\n", a));
+				if (!m_OpenCL)
+				{
+					add_code(Strutil::format("[%d] = closure_color(0);\n", a));
+				}
+				else
+				{
+					add_code(Strutil::format("[%d] = (closure_color)(0);\n", a));
+				}
 			} else {
 				add_code(Strutil::format("[%d] = 0;\n", a));
 			}
@@ -2099,11 +2295,25 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 			{
 				std::string unique_layer_name = format_var(Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id()));
 
-				mangled_name = "groupdata." + unique_layer_name + "_" + mangled_name;
+				if (!m_OpenCL)
+				{
+					mangled_name = "groupdata." + unique_layer_name + "_" + mangled_name;
+				}
+				else
+				{
+					mangled_name = "groupdata->" + unique_layer_name + "_" + mangled_name;
+				}
 			}
 			else if (sym.symtype() == SymTypeGlobal)
 			{
-				mangled_name = "sg." + mangled_name;
+				if (!m_OpenCL)
+				{
+					mangled_name = "sg." + mangled_name;
+				}
+				else
+				{
+					mangled_name = "sg->" + mangled_name;
+				}
 			}
 
 			// Fill in the constant val
@@ -2229,10 +2439,20 @@ bool BackendGLSL::build_instance(bool groupentry)
                 // FIXME -- I'm not sure I understand this.  Isn't this
                 // unnecessary if we wrote to the parameter ourself?
 				Symbol* dst_dealiased = dstsym->dealias();
-				std::string dst_mangled = "groupdata." + dst_layer_name + "_" + dst_dealiased->mangled();
-
+				std::string dst_mangled;
 				Symbol* src_dealiased = srcsym->dealias();
-				std::string src_mangled = "groupdata." + unique_layer_name + "_" + src_dealiased->mangled();
+				std::string src_mangled;
+
+				if (!m_OpenCL)
+				{
+					dst_mangled = "groupdata." + dst_layer_name + "_" + dst_dealiased->mangled();
+					src_mangled = "groupdata." + unique_layer_name + "_" + src_dealiased->mangled();
+				}
+				else
+				{
+					dst_mangled = "groupdata->" + dst_layer_name + "_" + dst_dealiased->mangled();
+					src_mangled = "groupdata->" + unique_layer_name + "_" + src_dealiased->mangled();
+				}
 
 				begin_code(format_var(dst_mangled));
 				add_code(" = ");
@@ -2281,16 +2501,38 @@ void BackendGLSL::build_init()
         FOREACH_PARAM (Symbol &sym, gi) {
 			if (sym.typespec().is_closure_based()) {
 				Symbol* dealiased = sym.dealias();
-				std::string mangled_name = format_var("groupdata." + unique_layer_name + "_" + dealiased->mangled());
+				std::string mangled_name;
+				if (!m_OpenCL)
+				{
+					mangled_name = format_var("groupdata." + unique_layer_name + "_" + dealiased->mangled());
+				}
+				else
+				{
+					mangled_name = format_var("groupdata->" + unique_layer_name + "_" + dealiased->mangled());
+				}
 
 				if (!sym.typespec().is_array()) {
 					begin_code(mangled_name);
-					add_code(" = closure_color(0);\n");
+					if (!m_OpenCL)
+					{
+						add_code(" = closure_color(0);\n");
+					}
+					else
+					{
+						add_code(" = (closure_color)(0);\n");
+					}
 				} else {
 					int arraylen = sym.typespec().arraylength();
 					for (int a = 0; a < arraylen; ++a) {
 						begin_code(mangled_name);
-						add_code(Strutil::format("[%d] = closure_color(0);\n", a));
+						if (!m_OpenCL)
+						{
+							add_code(Strutil::format("[%d] = closure_color(0);\n", a));
+						}
+						else
+						{
+							add_code(Strutil::format("[%d] = (closure_color)(0);\n", a));
+						}
 					}
 				}
             }
