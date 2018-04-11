@@ -445,7 +445,14 @@ void BackendGLSL::call_layer(int layer, bool unconditional)
 
 	if (!unconditional)
 	{
-		begin_code("if (!groupdata.run[");
+		if (!m_OpenCL)
+		{
+			begin_code("if (!groupdata.run[");
+		}
+		else
+		{
+			begin_code("if (!groupdata->run[");
+		}
 		add_code(Strutil::format("%d", layerfield));
 		add_code("])\n");
 		push_block();
@@ -919,9 +926,17 @@ bool BackendGLSL::build_op(int opnum)
 			}
 		}
 		gen_symbol(Val);
-		add_code("[");
-		gen_symbol(Index);
-		add_code("]");
+		if (m_OpenCL && op.opname() == op_compref)
+		{
+			add_code(".s");
+			gen_symbol(Index);
+		}
+		else
+		{
+			add_code("[");
+			gen_symbol(Index);
+			add_code("]");
+		}
 		if (to_closure || to_int) {
 			add_code(")");
 		}
@@ -948,9 +963,18 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(Result);
-		add_code("[");
-		gen_symbol(Index);
-		add_code("] = ");
+		if (m_OpenCL && op.opname() == op_compassign)
+		{
+			add_code(".s");
+			gen_symbol(Index);
+			add_code(" = ");
+		}
+		else
+		{
+			add_code("[");
+			gen_symbol(Index);
+			add_code("] = ");
+		}
 		if (to_closure) {
 			if (!m_OpenCL)
 			{
@@ -1017,11 +1041,22 @@ bool BackendGLSL::build_op(int opnum)
 			}
 		}
 		gen_symbol(M);
-		add_code("[");
-		gen_symbol(Row);
-		add_code("][");
-		gen_symbol(Col);
-		add_code("]");
+		if (!m_OpenCL)
+		{
+			add_code("[");
+			gen_symbol(Row);
+			add_code("][");
+			gen_symbol(Col);
+			add_code("]");
+		}
+		else
+		{
+			gen_symbol(M);
+			add_code("[");
+			gen_symbol(Row);
+			add_code("].s");
+			gen_symbol(Col);
+		}
 		if (to_closure || to_int) {
 			add_code(")");
 		}
@@ -1038,11 +1073,22 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(Result);
-		add_code("[");
-		gen_symbol(Row);
-		add_code("][");
-		gen_symbol(Col);
-		add_code("] = ");
+		if (!m_OpenCL)
+		{
+			add_code("[");
+			gen_symbol(Row);
+			add_code("][");
+			gen_symbol(Col);
+			add_code("] = ");
+		}
+		else
+		{
+			add_code("[");
+			gen_symbol(Row);
+			add_code("].s");
+			gen_symbol(Col);
+			add_code(" = ");
+		}
 		gen_symbol(Val);
 		add_code(";\n");
 
@@ -2363,7 +2409,14 @@ bool BackendGLSL::build_instance(bool groupentry)
         // For entry layers, we need an extra check to see if it already
         // ran. If it has, do an early return. Otherwise, set the 'ran' flag
         // and then run the layer.
-		begin_code("if (groupdata.run[");
+		if (!m_OpenCL)
+		{
+			begin_code("if (groupdata.run[");
+		}
+		else
+		{
+			begin_code("if (groupdata->run[");
+		}
 		add_code(Strutil::format("%d", layerfield));
 		add_code("])\n");
 
@@ -2372,7 +2425,14 @@ bool BackendGLSL::build_instance(bool groupentry)
 		pop_block();
     }
     // Mark this layer as executed
-	begin_code("groupdata.run[");
+	if (!m_OpenCL)
+	{
+		begin_code("groupdata.run[");
+	}
+	else
+	{
+		begin_code("groupdata->run[");
+	}
 	add_code(Strutil::format("%d", layerfield));
 	add_code("] = true;\n");
 
@@ -2498,7 +2558,14 @@ void BackendGLSL::build_init()
     // Group init clears all the "layer_run" and "userdata_initialized" flags.
 	for (int i = 0; i < m_num_used_layers; ++i)
 	{
-		begin_code(Strutil::format("groupdata.run[%d] = false;\n", i));
+		if (!m_OpenCL)
+		{
+			begin_code(Strutil::format("groupdata.run[%d] = false;\n", i));
+		}
+		else
+		{
+			begin_code(Strutil::format("groupdata->run[%d] = false;\n", i));
+		}
 	}
 
     int num_userdata = (int) group().m_userdata_names.size();
@@ -2564,7 +2631,14 @@ void BackendGLSL::type_groupdata()
 	// TODO: Now add the array that tells which userdata have been initialized,
     // and the space for the userdata values.
 
-	begin_code("struct GroupData\n");
+	if (!m_OpenCL)
+	{
+		begin_code("struct GroupData\n");
+	}
+	else
+	{
+		begin_code("typedef struct _GroupData\n");
+	}
 	push_block();
 
 	// For each layer in the group, add entries for all params that are
@@ -2594,7 +2668,14 @@ void BackendGLSL::type_groupdata()
 
 	// Specialized pop_block for structure definition
 	-- m_block_level;
-	begin_code("};\n");
+	if (!m_OpenCL)
+	{
+		begin_code("};\n");
+	}
+	else
+	{
+		begin_code("} GroupData;\n");
+	}
 }
 
 void BackendGLSL::run()
@@ -2642,7 +2723,14 @@ void BackendGLSL::run()
     // for the initialization and all public entry points.
 	std::string init_func_name = Strutil::format("group_%d_init", group().id());
 	begin_code(init_func_name);
-	add_code("(sg, groupdata);\n");
+	if (!m_OpenCL)
+	{
+		add_code("(sg, groupdata);\n");
+	}
+	else
+	{
+		add_code("(sg, &groupdata);\n");
+	}
     for (int layer = 0; layer < nlayers; ++layer) {
 		set_inst (layer);
 		if (m_layer_remap[layer] != -1) {
@@ -2651,7 +2739,14 @@ void BackendGLSL::run()
 				(group().num_entry_layers() == 0 && 
 				layer == (nlayers - 1))) { // or the last layer as entry
 				begin_code(layer_func_name);
-				add_code("(sg, groupdata);\n");
+				if (!m_OpenCL)
+				{
+					add_code("(sg, groupdata);\n");
+				}
+				else
+				{
+					add_code("(sg, &groupdata);\n");
+				}
 			}
 		}
     }
