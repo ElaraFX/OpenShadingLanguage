@@ -384,23 +384,27 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 
 		if (!m_OpenCL)
 		{
-			mangled_name = "groupdata." + unique_layer_name + "_" + mangled_name;
+			mangled_name = "groupdata." + format_var(unique_layer_name + "_" + mangled_name);
 		}
 		else
 		{
-			mangled_name = "groupdata->" + unique_layer_name + "_" + mangled_name;
+			mangled_name = "groupdata->" + format_var(unique_layer_name + "_" + mangled_name);
 		}
 	}
 	else if (sym.symtype() == SymTypeGlobal)
 	{
 		if (!m_OpenCL)
 		{
-			mangled_name = "sg." + mangled_name;
+			mangled_name = "sg." + format_var(mangled_name);
 		}
 		else
 		{
-			mangled_name = "sg->" + mangled_name;
+			mangled_name = "sg->" + format_var(mangled_name);
 		}
+	}
+	else
+	{
+		mangled_name = format_var(mangled_name);
 	}
 
 	if (dealiased->is_constant() && dealiased->data() != NULL)
@@ -409,7 +413,7 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 	}
 	else
 	{
-		add_code(format_var(mangled_name));
+		add_code(mangled_name);
 	}
 }
 
@@ -2297,27 +2301,31 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 
 				if (!m_OpenCL)
 				{
-					mangled_name = "groupdata." + unique_layer_name + "_" + mangled_name;
+					mangled_name = "groupdata." + format_var(unique_layer_name + "_" + mangled_name);
 				}
 				else
 				{
-					mangled_name = "groupdata->" + unique_layer_name + "_" + mangled_name;
+					mangled_name = "groupdata->" + format_var(unique_layer_name + "_" + mangled_name);
 				}
 			}
 			else if (sym.symtype() == SymTypeGlobal)
 			{
 				if (!m_OpenCL)
 				{
-					mangled_name = "sg." + mangled_name;
+					mangled_name = "sg." + format_var(mangled_name);
 				}
 				else
 				{
-					mangled_name = "sg->" + mangled_name;
+					mangled_name = "sg->" + format_var(mangled_name);
 				}
+			}
+			else
+			{
+				mangled_name = format_var(mangled_name);
 			}
 
 			// Fill in the constant val
-			begin_code(format_var(mangled_name));
+			begin_code(mangled_name);
 			add_code(" = ");
 			gen_data(&sym);
 			add_code(";\n");
@@ -2445,18 +2453,18 @@ bool BackendGLSL::build_instance(bool groupentry)
 
 				if (!m_OpenCL)
 				{
-					dst_mangled = "groupdata." + dst_layer_name + "_" + dst_dealiased->mangled();
-					src_mangled = "groupdata." + unique_layer_name + "_" + src_dealiased->mangled();
+					dst_mangled = "groupdata." + format_var(dst_layer_name + "_" + dst_dealiased->mangled());
+					src_mangled = "groupdata." + format_var(unique_layer_name + "_" + src_dealiased->mangled());
 				}
 				else
 				{
-					dst_mangled = "groupdata->" + dst_layer_name + "_" + dst_dealiased->mangled();
-					src_mangled = "groupdata->" + unique_layer_name + "_" + src_dealiased->mangled();
+					dst_mangled = "groupdata->" + format_var(dst_layer_name + "_" + dst_dealiased->mangled());
+					src_mangled = "groupdata->" + format_var(unique_layer_name + "_" + src_dealiased->mangled());
 				}
 
-				begin_code(format_var(dst_mangled));
+				begin_code(dst_mangled);
 				add_code(" = ");
-				add_code(format_var(src_mangled));
+				add_code(src_mangled);
 				add_code(";\n");
             }
         }
@@ -2504,11 +2512,11 @@ void BackendGLSL::build_init()
 				std::string mangled_name;
 				if (!m_OpenCL)
 				{
-					mangled_name = format_var("groupdata." + unique_layer_name + "_" + dealiased->mangled());
+					mangled_name = "groupdata." + format_var(unique_layer_name + "_" + dealiased->mangled());
 				}
 				else
 				{
-					mangled_name = format_var("groupdata->" + unique_layer_name + "_" + dealiased->mangled());
+					mangled_name = "groupdata->" + format_var(unique_layer_name + "_" + dealiased->mangled());
 				}
 
 				if (!sym.typespec().is_array()) {
