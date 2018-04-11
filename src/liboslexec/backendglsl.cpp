@@ -333,8 +333,17 @@ void BackendGLSL::gen_data(const Symbol *dealiased)
 			add_code((a != 0) ? ", " : "");
 		}
 		if (t.aggregate != 1) {
-			add_code(t.c_str());
-			add_code("(");
+			if (!m_OpenCL)
+			{
+				add_code(t.c_str());
+				add_code("(");
+			}
+			else
+			{
+				add_code("(");
+				add_code(t.c_str());
+				add_code(")(");
+			}
 		}
 		if (t.basetype == TypeDesc::FLOAT) {
 			for (int j = 0; j < t.aggregate; ++j) {
