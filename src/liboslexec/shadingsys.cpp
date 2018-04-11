@@ -2721,6 +2721,12 @@ ShadingSystemImpl::compile_generic (const char *language,
     }
 
     BackendGLSL glsl_gen (*this, group, ctx);
+
+	if (strcmp(language, "OpenCL") == 0)
+	{
+		glsl_gen.set_OpenCL(true);
+	}
+
     glsl_gen.run ();
 	code = glsl_gen.get_code ();
 

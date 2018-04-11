@@ -216,6 +216,7 @@ BackendGLSL::BackendGLSL(
 	ShadingContext *ctx)
     : OSOProcessorBase(shadingsys, group, ctx)
 {
+	m_OpenCL = false;
 }
 
 BackendGLSL::~BackendGLSL()
@@ -338,7 +339,14 @@ void BackendGLSL::gen_data(const Symbol *dealiased)
 		if (t.basetype == TypeDesc::FLOAT) {
 			for (int j = 0; j < t.aggregate; ++j) {
 				add_code((j != 0) ? ", " : "");
-				add_code(format_float(Strutil::format("float(%.9f)", ((float *)dealiased->data())[j])));
+				if (!m_OpenCL)
+				{
+					add_code("float(" + format_float(Strutil::format("%.9f", ((float *)dealiased->data())[j])) + ")");
+				}
+				else
+				{
+					add_code(format_float(Strutil::format("%.9f", ((float *)dealiased->data())[j])) + "f");
+				}
 			}
 		} else if (t.basetype == TypeDesc::INT) {
 			for (int j = 0; j < t.aggregate; ++j) {

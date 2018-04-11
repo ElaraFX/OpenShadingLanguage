@@ -27,6 +27,8 @@ public:
 
 	const std::string & get_code() const { return m_code; }
 
+	void set_OpenCL(bool val) { m_OpenCL = val; }
+
 private:
 	void reset_code();
 	void begin_code(const std::string & code);
@@ -62,6 +64,8 @@ private:
 
 	int m_function_id;					///< Line counter for function call
 	std::vector<int> m_function_stack;	///< Stack of function calls
+
+	bool m_OpenCL;						///< Target language is OpenCL
 };
 
 
