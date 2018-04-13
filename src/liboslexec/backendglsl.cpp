@@ -723,7 +723,7 @@ bool BackendGLSL::build_op(int opnum)
 			}
 			else
 			{
-				add_code("(closure_color)(");
+				add_code("closure_int(");
 			}
 		} else if (to_int) {
 			if (!m_OpenCL)
@@ -761,19 +761,36 @@ bool BackendGLSL::build_op(int opnum)
 		begin_code("");
 		gen_symbol(result);
 		add_code(" = ");
-		gen_symbol(a);
 
-		if (op.opname() == op_add) {
-			add_code(" + ");
-		} else if (op.opname() == op_sub) {
-			add_code(" - ");
-		} else if (op.opname() == op_mul) {
-			add_code(" * ");
-		} else {
-			add_code(" / ");
+		if (m_OpenCL && 
+			result.typespec().is_closure() && 
+			a.typespec().is_closure() && 
+			b.typespec().is_closure() && 
+			op.opname() == op_add)
+		{
+			add_code("closure_add(");
+			gen_symbol(a);
+			add_code(", ");
+			gen_symbol(b);
+			add_code(")");
+		}
+		else
+		{
+			gen_symbol(a);
+
+			if (op.opname() == op_add) {
+				add_code(" + ");
+			} else if (op.opname() == op_sub) {
+				add_code(" - ");
+			} else if (op.opname() == op_mul) {
+				add_code(" * ");
+			} else {
+				add_code(" / ");
+			}
+
+			gen_symbol(b);
 		}
 
-		gen_symbol(b);
 		add_code(";\n");
 
 		return true;
@@ -913,7 +930,7 @@ bool BackendGLSL::build_op(int opnum)
 			}
 			else
 			{
-				add_code("(closure_color)(");
+				add_code("closure_int(");
 			}
 		} else if (to_int) {
 			if (!m_OpenCL)
@@ -982,7 +999,7 @@ bool BackendGLSL::build_op(int opnum)
 			}
 			else
 			{
-				add_code("(closure_color)(");
+				add_code("closure_int(");
 			}
 		} else if (to_int) {
 			if (!m_OpenCL)
@@ -1028,7 +1045,7 @@ bool BackendGLSL::build_op(int opnum)
 			}
 			else
 			{
-				add_code("(closure_color)(");
+				add_code("closure_int(");
 			}
 		} else if (to_int) {
 			if (!m_OpenCL)
@@ -2285,7 +2302,7 @@ void BackendGLSL::assign_zero(const Symbol & sym)
 			}
 			else
 			{
-				add_code(" = (closure_color)(0);\n");
+				add_code(" = closure_int(0);\n");
 			}
 		} else {
 			add_code(" = 0;\n");
@@ -2301,7 +2318,7 @@ void BackendGLSL::assign_zero(const Symbol & sym)
 				}
 				else
 				{
-					add_code(Strutil::format("[%d] = (closure_color)(0);\n", a));
+					add_code(Strutil::format("[%d] = closure_int(0);\n", a));
 				}
 			} else {
 				add_code(Strutil::format("[%d] = 0;\n", a));
@@ -2603,7 +2620,7 @@ void BackendGLSL::build_init()
 					}
 					else
 					{
-						add_code(" = (closure_color)(0);\n");
+						add_code(" = closure_int(0);\n");
 					}
 				} else {
 					int arraylen = sym.typespec().arraylength();
@@ -2615,7 +2632,7 @@ void BackendGLSL::build_init()
 						}
 						else
 						{
-							add_code(Strutil::format("[%d] = (closure_color)(0);\n", a));
+							add_code(Strutil::format("[%d] = closure_int(0);\n", a));
 						}
 					}
 				}
