@@ -764,15 +764,50 @@ bool BackendGLSL::build_op(int opnum)
 
 		if (m_OpenCL && 
 			result.typespec().is_closure() && 
-			a.typespec().is_closure() && 
-			b.typespec().is_closure() && 
-			op.opname() == op_add)
+			(op.opname() == op_add || 
+			op.opname() == op_mul))
 		{
-			add_code("closure_add(");
-			gen_symbol(a);
-			add_code(", ");
-			gen_symbol(b);
-			add_code(")");
+			if (op.opname() == op_add)
+			{
+				add_code("closure_add(");
+				gen_symbol(a);
+				add_code(", ");
+				gen_symbol(b);
+				add_code(")");
+			}
+			else
+			{
+				if (a.typespec().is_closure())
+				{
+					if (b.typespec().is_float())
+					{
+						add_code("closure_mul_float(");
+					}
+					else
+					{
+						add_code("closure_mul_color(");
+					}
+					gen_symbol(a);
+					add_code(", ");
+					gen_symbol(b);
+					add_code(")");
+				}
+				else
+				{
+					if (a.typespec().is_float())
+					{
+						add_code("closure_mul_float(");
+					}
+					else
+					{
+						add_code("closure_mul_color(");
+					}
+					gen_symbol(b);
+					add_code(", ");
+					gen_symbol(a);
+					add_code(")");
+				}
+			}
 		}
 		else
 		{
