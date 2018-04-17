@@ -769,7 +769,7 @@ bool BackendGLSL::build_op(int opnum)
 		{
 			if (op.opname() == op_add)
 			{
-				add_code("closure_add(");
+				add_code("closure_add(sg, ");
 				gen_symbol(a);
 				add_code(", ");
 				gen_symbol(b);
@@ -781,11 +781,11 @@ bool BackendGLSL::build_op(int opnum)
 				{
 					if (b.typespec().is_float())
 					{
-						add_code("closure_mul_float(");
+						add_code("closure_mul_float(sg, ");
 					}
 					else
 					{
-						add_code("closure_mul_color(");
+						add_code("closure_mul_color(sg, ");
 					}
 					gen_symbol(a);
 					add_code(", ");
@@ -796,11 +796,11 @@ bool BackendGLSL::build_op(int opnum)
 				{
 					if (a.typespec().is_float())
 					{
-						add_code("closure_mul_float(");
+						add_code("closure_mul_float(sg, ");
 					}
 					else
 					{
-						add_code("closure_mul_color(");
+						add_code("closure_mul_color(sg, ");
 					}
 					gen_symbol(b);
 					add_code(", ");
