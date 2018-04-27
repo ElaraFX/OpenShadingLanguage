@@ -1365,9 +1365,27 @@ bool BackendGLSL::build_op(int opnum)
 			if (weighted)
 			{
 				add_code(" = ");
-				gen_symbol(*weight);
-				add_code(Strutil::format(" * closure_%s(sg, ", 
-					closure_name.c_str()));
+				if (m_OpenCL)
+				{
+					if (weight->typespec().is_float())
+					{
+						add_code("closure_mul_float(sg, ");
+					}
+					else
+					{
+						add_code("closure_mul_color(sg, ");
+					}
+
+					gen_symbol(Result);
+					add_code(Strutil::format(", closure_%s(sg, ", 
+						closure_name.c_str()));
+				}
+				else
+				{
+					gen_symbol(*weight);
+					add_code(Strutil::format(" * closure_%s(sg, ", 
+						closure_name.c_str()));
+				}
 			}
 			else
 			{
@@ -1388,15 +1406,39 @@ bool BackendGLSL::build_op(int opnum)
 			if (weighted)
 			{
 				add_code(" = ");
-				gen_symbol(*weight);
-				add_code(Strutil::format(" * closure_%s(sg", 
-					closure_name.c_str()));
+				if (m_OpenCL)
+				{
+					if (weight->typespec().is_float())
+					{
+						add_code("closure_mul_float(sg, ");
+					}
+					else
+					{
+						add_code("closure_mul_color(sg, ");
+					}
+
+					gen_symbol(Result);
+					add_code(Strutil::format(", closure_%s(sg", 
+						closure_name.c_str()));
+				}
+				else
+				{
+					gen_symbol(*weight);
+					add_code(Strutil::format(" * closure_%s(sg", 
+						closure_name.c_str()));
+				}
 			}
 			else
 			{
 				add_code(Strutil::format(" = closure_%s(sg", 
 					closure_name.c_str()));
 			}
+		}
+
+		if (weighted && m_OpenCL)
+		{
+			add_code("), ");
+			gen_symbol(*weight);
 		}
 
 		add_code(");\n");
