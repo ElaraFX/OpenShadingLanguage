@@ -1494,7 +1494,11 @@ bool BackendGLSL::build_op(int opnum)
 			add_code(" = texture_rgb(sg, ");
 		}
 		// Use hash to make string into constants
-		add_code(Strutil::format("texSampler_%d, ", 
+		if (!m_OpenCL)
+		{
+			add_code("texSampler_");
+		}
+		add_code(Strutil::format("%d, ", 
 			Filename.is_constant() ? 
 			(int)(Filename.get_string().hash()) : 0));
 		gen_symbol(S);
@@ -1518,6 +1522,10 @@ bool BackendGLSL::build_op(int opnum)
 
 		if (alpha != NULL) {
 			add_code(", ");
+			if (m_OpenCL)
+			{
+				add_code("&");
+			}
 			gen_symbol(*alpha);
 		}
 
@@ -1561,6 +1569,10 @@ bool BackendGLSL::build_op(int opnum)
 		}
 		gen_symbol(Index);
 		add_code(", ");
+		if (m_OpenCL)
+		{
+			add_code("&");
+		}
 		gen_symbol(Destination);
 		add_code(");\n");
 
