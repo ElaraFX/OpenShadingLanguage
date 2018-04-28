@@ -1126,9 +1126,9 @@ bool BackendGLSL::build_op(int opnum)
 				add_code("(int)(");
 			}
 		}
-		gen_symbol(M);
 		if (!m_OpenCL)
 		{
+			gen_symbol(M);
 			add_code("[");
 			gen_symbol(Row);
 			add_code("][");
@@ -1137,10 +1137,13 @@ bool BackendGLSL::build_op(int opnum)
 		}
 		else
 		{
-			add_code("[");
+			add_code("mat_comp_get(");
+			gen_symbol(M);
+			add_code(", ");
 			gen_symbol(Row);
-			add_code("].s");
+			add_code(", ");
 			gen_symbol(Col);
+			add_code(")");
 		}
 		if (to_closure || to_int) {
 			add_code(")");
@@ -1157,24 +1160,28 @@ bool BackendGLSL::build_op(int opnum)
 		Symbol& Val = *opargsym (op, 3);
 
 		begin_code("");
-		gen_symbol(Result);
 		if (!m_OpenCL)
 		{
+			gen_symbol(Result);
 			add_code("[");
 			gen_symbol(Row);
 			add_code("][");
 			gen_symbol(Col);
 			add_code("] = ");
+			gen_symbol(Val);
 		}
 		else
 		{
-			add_code("[");
+			add_code("mat_comp_set(&");
+			gen_symbol(Result);
+			add_code(", ");
 			gen_symbol(Row);
-			add_code("].s");
+			add_code(", ");
 			gen_symbol(Col);
-			add_code(" = ");
+			add_code(", ");
+			gen_symbol(Val);
+			add_code(")");
 		}
-		gen_symbol(Val);
 		add_code(";\n");
 
 		return true;
