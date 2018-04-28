@@ -1137,7 +1137,6 @@ bool BackendGLSL::build_op(int opnum)
 		}
 		else
 		{
-			gen_symbol(M);
 			add_code("[");
 			gen_symbol(Row);
 			add_code("].s");
@@ -1423,9 +1422,16 @@ bool BackendGLSL::build_op(int opnum)
 
 			for (int i = closure_param_offset; i < op.nargs(); ++i)
 			{
+				Symbol & sym = *opargsym(op, i);
+
+				// TODO: optional parameters are ignored for now
+				if (sym.typespec().is_string())
+				{
+					break;
+				}
+
 				add_code((i != closure_param_offset) ? ", " : "");
 
-				Symbol & sym = *opargsym(op, i);
 				gen_symbol(sym);
 			}
 		}
@@ -1881,13 +1887,32 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(Result);
-		add_code(" = getmatrix_");
-		gen_symbol(From);
-		add_code("_to_");
-		gen_symbol(To);
-		add_code("(");
-		gen_symbol(M);
-		add_code(");\n");
+
+		if (From.is_constant() && From.typespec().is_string() && 
+			To.is_constant() && To.typespec().is_string())
+		{
+			add_code(" = TRUE;\n");
+			gen_symbol(M);
+			add_code(" = MAT_");
+			add_code(((ustring *)From.data())[0].string());
+			add_code("_to_");
+			add_code(((ustring *)To.data())[0].string());
+			add_code(";\n");
+		}
+		else
+		{
+			add_code(" = getmatrix(");
+			gen_symbol(From);
+			add_code(", ");
+			gen_symbol(To);
+			add_code(", ");
+			if (m_OpenCL)
+			{
+				add_code("&");
+			}
+			gen_symbol(M);
+			add_code(");\n");
+		}
 
 		return true;
 	}
@@ -1903,25 +1928,40 @@ bool BackendGLSL::build_op(int opnum)
 		Symbol *To = opargsym (op, (nargs == 3) ? 1 : 2);
 		Symbol *P = opargsym (op, (nargs == 3) ? 2 : 3);
 
+		begin_code("");
+		gen_symbol(*Result);
+		add_code(Strutil::format(" = %s(", op.opname().c_str()));
+
 		if (From == NULL) {
-			begin_code("");
-			gen_symbol(*Result);
-			add_code(Strutil::format(" = %s(", op.opname().c_str()));
-			gen_symbol(*To);
-			add_code(", ");
-			gen_symbol(*P);
-			add_code(");\n");
+			if (To->is_constant() && To->typespec().is_string())
+			{
+				add_code("MAT_common_to_");
+				add_code(((ustring *)To->data())[0].string());
+			}
+			else
+			{
+				gen_symbol(*To);
+			}
 		} else {
-			begin_code("");
-			gen_symbol(*Result);
-			add_code(Strutil::format(" = %s(", op.opname().c_str()));
-			gen_symbol(*From);
-			add_code(", ");
-			gen_symbol(*To);
-			add_code(", ");
-			gen_symbol(*P);
-			add_code(");\n");
+			if (From->is_constant() && From->typespec().is_string() && 
+				To->is_constant() && To->typespec().is_string())
+			{
+				add_code("MAT_");
+				add_code(((ustring *)From->data())[0].string());
+				add_code("_to_");
+				add_code(((ustring *)To->data())[0].string());
+			}
+			else
+			{
+				gen_symbol(*From);
+				add_code(", ");
+				gen_symbol(*To);
+			}
 		}
+
+		add_code(", ");
+		gen_symbol(*P);
+		add_code(");\n");
 
 		return true;
 	}
