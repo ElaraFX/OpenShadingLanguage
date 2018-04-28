@@ -706,7 +706,7 @@ bool BackendGLSL::build_op(int opnum)
 
 		bool to_closure = (result.typespec().is_closure() && 
 			!src.typespec().is_closure_based() && 
-			(src.typespec().is_int() || src.typespec().is_float()));
+			(src.typespec().is_int() || src.typespec().is_float() || src.typespec().is_color()));
 
 		bool to_int = (!result.typespec().is_closure() && 
 			result.typespec().is_int() && 
@@ -723,7 +723,14 @@ bool BackendGLSL::build_op(int opnum)
 			}
 			else
 			{
-				add_code("closure_int(");
+				if (src.typespec().is_color())
+				{
+					add_code("closure_int3(");
+				}
+				else
+				{
+					add_code("closure_int(");
+				}
 			}
 		} else if (to_int) {
 			if (!m_OpenCL)
@@ -971,7 +978,14 @@ bool BackendGLSL::build_op(int opnum)
 			}
 			else
 			{
-				add_code("closure_int(");
+				if (Val.typespec().elementtype().is_color())
+				{
+					add_code("closure_int3(");
+				}
+				else
+				{
+					add_code("closure_int(");
+				}
 			}
 		} else if (to_int) {
 			if (!m_OpenCL)
@@ -1012,7 +1026,7 @@ bool BackendGLSL::build_op(int opnum)
 
 		bool to_closure = (Result.typespec().is_closure_based() && 
 			!Val.typespec().is_closure_based() && 
-			(Val.typespec().is_int() || Val.typespec().is_float()));
+			(Val.typespec().is_int() || Val.typespec().is_float() || Val.typespec().is_color()));
 
 		bool to_int = (!Result.typespec().is_closure_based() && 
 			Result.typespec().is_int_based() && 
@@ -1040,7 +1054,14 @@ bool BackendGLSL::build_op(int opnum)
 			}
 			else
 			{
-				add_code("closure_int(");
+				if (Val.typespec().is_color())
+				{
+					add_code("closure_int3(");
+				}
+				else
+				{
+					add_code("closure_int(");
+				}
 			}
 		} else if (to_int) {
 			if (!m_OpenCL)
@@ -1086,7 +1107,14 @@ bool BackendGLSL::build_op(int opnum)
 			}
 			else
 			{
-				add_code("closure_int(");
+				if (M.typespec().elementtype().is_color())
+				{
+					add_code("closure_int3(");
+				}
+				else
+				{
+					add_code("closure_int(");
+				}
 			}
 		} else if (to_int) {
 			if (!m_OpenCL)
