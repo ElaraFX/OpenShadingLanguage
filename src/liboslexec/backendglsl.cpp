@@ -713,6 +713,11 @@ bool BackendGLSL::build_op(int opnum)
 			!src.typespec().is_closure() && 
 			src.typespec().is_float());
 
+		bool to_triple = (!result.typespec().is_closure() && 
+			result.typespec().is_triple() && 
+			!src.typespec().is_closure() && 
+			(src.typespec().is_int() || src.typespec().is_float()));
+
 		begin_code("");
 		gen_symbol(result);
 		add_code(" = ");
@@ -741,6 +746,15 @@ bool BackendGLSL::build_op(int opnum)
 			{
 				add_code("(int)(");
 			}
+		} else if (to_triple) {
+			if (!m_OpenCL)
+			{
+				add_code(Strutil::format("%s(", result.typespec().c_str()));
+			}
+			else
+			{
+				add_code(Strutil::format("(%s)(", result.typespec().c_str()));
+			}
 		}
 		if (op.opname() == op_neg) {
 			add_code("- ");
@@ -748,7 +762,7 @@ bool BackendGLSL::build_op(int opnum)
 			add_code("~ ");
 		}
 		gen_symbol(src);
-		if (to_closure || to_int) {
+		if (to_closure || to_int || to_triple) {
 			add_code(")");
 		}
 		add_code(";\n");
@@ -1529,10 +1543,15 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(Result);
+		add_code(" = ");
+		if (Result.typespec().is_float())
+		{
+			add_code("(");
+		}
 		if (alpha != NULL) {
-			add_code(" = texture_rgba(sg, ");
+			add_code("texture_rgba(sg, ");
 		} else {
-			add_code(" = texture_rgb(sg, ");
+			add_code("texture_rgb(sg, ");
 		}
 		// Use hash to make string into constants
 		add_code(Strutil::format("texSampler_%x, ", 
@@ -1566,7 +1585,14 @@ bool BackendGLSL::build_op(int opnum)
 			gen_symbol(*alpha);
 		}
 
-		add_code(");\n");
+		if (Result.typespec().is_float())
+		{
+			add_code(")).x;\n");
+		}
+		else
+		{
+			add_code(");\n");
+		}
 
 		return true;
 	}
@@ -2583,7 +2609,14 @@ bool BackendGLSL::build_instance(bool groupentry)
 		begin_code("void ");
 	}
 	add_code(unique_layer_name);
-	add_code("(ShaderGlobalsRef sg, GroupDataRef groupdata)\n");
+	if (!m_OpenCL)
+	{
+		add_code(Strutil::format("(inout ShaderGlobals sg, inout GroupData_%d groupdata)\n", group().id()));
+	}
+	else
+	{
+		add_code(Strutil::format("(ShaderGlobals *sg, GroupData_%d *groupdata)\n", group().id()));
+	}
 	push_block();
 
 	//llvm::Value *layerfield = layer_run_ref(m_layer_remap[layer()]);
@@ -2735,7 +2768,14 @@ void BackendGLSL::build_init()
 
 	begin_code("void ");
 	add_code(unique_name);
-	add_code("(ShaderGlobalsRef sg, GroupDataRef groupdata)\n");
+	if (!m_OpenCL)
+	{
+		add_code(Strutil::format("(inout ShaderGlobals sg, inout GroupData_%d groupdata)\n", group().id()));
+	}
+	else
+	{
+		add_code(Strutil::format("(ShaderGlobals *sg, GroupData_%d *groupdata)\n", group().id()));
+	}
 	push_block();
 
     // Group init clears all the "layer_run" and "userdata_initialized" flags.
@@ -2816,11 +2856,11 @@ void BackendGLSL::type_groupdata()
 
 	if (!m_OpenCL)
 	{
-		begin_code("struct GroupData\n");
+		begin_code(Strutil::format("struct GroupData_%d\n", group().id()));
 	}
 	else
 	{
-		begin_code("typedef struct _GroupData\n");
+		begin_code(Strutil::format("typedef struct _GroupData_%d\n", group().id()));
 	}
 	push_block();
 
@@ -2857,7 +2897,7 @@ void BackendGLSL::type_groupdata()
 	}
 	else
 	{
-		begin_code("} GroupData;\n");
+		begin_code(Strutil::format("} GroupData_%d;\n", group().id()));
 	}
 }
 
@@ -2898,9 +2938,16 @@ void BackendGLSL::run()
         }
     }
 
-	begin_code("void osl_main(ShaderGlobalsRef sg)\n");
+	if (!m_OpenCL)
+	{
+		begin_code("void osl_main(inout ShaderGlobals sg)\n");
+	}
+	else
+	{
+		begin_code("void osl_main(ShaderGlobals *sg)\n");
+	}
 	push_block();
-	begin_code("GroupData groupdata;\n");
+	begin_code(Strutil::format("GroupData_%d groupdata;\n", group().id()));
 
 	// Force the JIT to happen now and retrieve the JITed function pointers
     // for the initialization and all public entry points.
