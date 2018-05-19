@@ -150,7 +150,8 @@ std::string format_var(const std::string & name)
 		if (var[i] == ' ' || 
 			var[i] == '-' || 
 			var[i] == '#' || 
-			var[i] == '$') {
+			var[i] == '$' || 
+			var[i] == '.') {
 			var[i] = '_';
 		}
 	}
@@ -2149,7 +2150,7 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(Result);
-		add_code(" = trace(");
+		add_code(" = trace(sg, ");
 		gen_symbol(Pos);
 		add_code(", ");
 		gen_symbol(Dir);
