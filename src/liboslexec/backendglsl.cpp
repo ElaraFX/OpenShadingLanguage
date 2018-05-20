@@ -315,9 +315,16 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
 		}
 		add_code(";\n");
     } else {
-		begin_code(typespec.simpletype().c_str());
+		TypeDesc t = typespec.simpletype();
+		TypeDesc elemtype = t.elementtype();
+		begin_code(elemtype.c_str());
 		add_code(" ");
 		add_code(format_var(name));
+		if (typespec.is_unsized_array()) {
+            add_code("[]");
+		} else if (typespec.arraylength() > 0) {
+            add_code(Strutil::format("[%d]", typespec.arraylength()));
+		}
         add_code(";\n");
     }
 }
@@ -325,9 +332,15 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
 void BackendGLSL::gen_data(const Symbol *dealiased)
 {
 	TypeDesc t = dealiased->typespec().simpletype();
+	TypeDesc elemtype = t.elementtype();
 	bool is_closure_based = dealiased->typespec().is_closure_based();
 	if (t.is_array()) {
-		add_code("{");
+		if (!m_OpenCL) {
+			add_code(t.c_str());
+			add_code("(");
+		} else {
+			add_code("{");
+		}
 	}
 	for (int a = 0; a < t.numelements(); ++a) {
 		if (t.is_array()) {
@@ -336,13 +349,13 @@ void BackendGLSL::gen_data(const Symbol *dealiased)
 		if (t.aggregate != 1) {
 			if (!m_OpenCL)
 			{
-				add_code(t.c_str());
+				add_code(elemtype.c_str());
 				add_code("(");
 			}
 			else
 			{
 				add_code("(");
-				add_code(t.c_str());
+				add_code(elemtype.c_str());
 				add_code(")(");
 			}
 		}
@@ -378,7 +391,11 @@ void BackendGLSL::gen_data(const Symbol *dealiased)
 		}
 	}
 	if (t.is_array()) {
-		add_code("}");
+		if (!m_OpenCL) {
+			add_code(")");
+		} else {
+			add_code("}");
+		}
 	}
 }
 
@@ -417,7 +434,9 @@ void BackendGLSL::gen_symbol(Symbol & sym)
 		mangled_name = format_var(mangled_name);
 	}
 
-	if (dealiased->is_constant() && dealiased->data() != NULL)
+	// [Elvic] For array constants, just reference the symbol by name
+	if (!dealiased->typespec().is_array() && 
+		dealiased->is_constant() && dealiased->data() != NULL)
 	{
 		gen_data(dealiased);
 	}
@@ -2660,7 +2679,11 @@ bool BackendGLSL::build_instance(bool groupentry)
         // Skip constants -- we always inline scalar constants, and for
         // array constants we will just use the pointers to the copy of
         // the constant that belongs to the instance.
-        if (s.symtype() == SymTypeConst)
+		//
+		// [Elvic] LLVM can share pointers to ConstantPool with OSL. 
+		// However for GLSL, we have to allocate symbol and assign 
+		// initial values for array constants.
+		if (s.symtype() == SymTypeConst && !s.typespec().is_array())
             continue;
         // Skip structure placeholders
         if (s.typespec().is_structure())
