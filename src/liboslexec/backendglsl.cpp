@@ -2609,63 +2609,10 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
 			}
 
 			// Fill in the constant val
-			if (!dealiased->typespec().is_array()) {
-				begin_code(mangled_name);
-				add_code(" = ");
-				gen_data(dealiased);
-				add_code(";\n");
-			} else {
-				TypeDesc t = dealiased->typespec().simpletype();
-				TypeDesc elemtype = t.elementtype();
-				for (int a = 0, c = 0; a < t.numelements(); ++a) {
-					begin_code(mangled_name);
-					add_code(Strutil::format("[%d] = ", a));
-					if (t.aggregate != 1) {
-						if (!m_OpenCL)
-						{
-							add_code(elemtype.c_str());
-							add_code("(");
-						}
-						else
-						{
-							add_code("(");
-							add_code(elemtype.c_str());
-							add_code(")(");
-						}
-					}
-					if (t.basetype == TypeDesc::FLOAT) {
-						for (int j = 0; j < t.aggregate; ++j, ++c) {
-							add_code((j != 0) ? ", " : "");
-							if (!m_OpenCL)
-							{
-								add_code("float(" + format_float(Strutil::format("%.9f", ((float *)dealiased->data())[c])) + ")");
-							}
-							else
-							{
-								add_code(format_float(Strutil::format("%.9f", ((float *)dealiased->data())[c])) + "f");
-							}
-						}
-					} else if (t.basetype == TypeDesc::INT) {
-						for (int j = 0; j < t.aggregate; ++j, ++c) {
-							add_code((j != 0) ? ", " : "");
-							add_code(Strutil::format("%d", ((int *)dealiased->data())[c]));
-						}
-					} else if (t.basetype == TypeDesc::STRING) {
-						for (int j = 0; j < t.aggregate; ++j, ++c) {
-							add_code((j != 0) ? ", " : "");
-							add_code("\"");
-							add_code(Strutil::escape_chars(((ustring *)dealiased->data())[c].string()));
-							add_code("\"");
-						}
-					} else {
-						shadingcontext()->error("Unsupported symbol data type %d\n", (int)t.basetype);
-					}
-					if (t.aggregate != 1) {
-						add_code(")");
-					}
-					add_code("\n");
-				}
-			}
+			begin_code(mangled_name);
+			add_code(" = ");
+			gen_data(&sym);
+			add_code(";\n");
 		}
     }
 }
