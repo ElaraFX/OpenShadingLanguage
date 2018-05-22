@@ -37,7 +37,7 @@ private:
 	void pop_block();
 	void push_function(Symbol & function_name);
 	void pop_function();
-	void gen_typespec(const TypeSpec & typespec, const std::string & name);
+	void gen_typespec(const TypeSpec & typespec, const std::string & name, bool newline);
 	void gen_data(const Symbol *dealiased);
 	void gen_symbol(Symbol & sym);
 	bool gen_code(const Opcode & op);
@@ -51,6 +51,7 @@ private:
 	void get_or_allocate_symbol(const Symbol & sym);
 	void assign_zero(const Symbol & sym);
 	void assign_initial_value(const Symbol & sym);
+	void init_array_constants(const Symbol & sym);
 	bool build_instance(bool groupentry);
 	void build_init();
 	void type_groupdata();

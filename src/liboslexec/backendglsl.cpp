@@ -293,7 +293,7 @@ void BackendGLSL::pop_function()
 	begin_code("while (false);\n");
 }
 
-void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & name)
+void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & name, bool newline)
 {
     if (typespec.is_closure() || typespec.is_closure_array()) {
         begin_code("closure_color ");
@@ -303,7 +303,6 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
 		} else if (typespec.arraylength() > 0) {
             add_code(Strutil::format("[%d]", typespec.arraylength()));
 		}
-		add_code(";\n");
     } else if (typespec.structure() > 0) {
 		begin_code(typespec.structspec()->mangled());
 		add_code(" ");
@@ -313,7 +312,6 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
 		} else if (typespec.arraylength() > 0) {
             add_code(Strutil::format("[%d]", typespec.arraylength()));
 		}
-		add_code(";\n");
     } else {
 		TypeDesc t = typespec.simpletype();
 		TypeDesc elemtype = t.elementtype();
@@ -325,8 +323,10 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
 		} else if (typespec.arraylength() > 0) {
             add_code(Strutil::format("[%d]", typespec.arraylength()));
 		}
-        add_code(";\n");
     }
+	if (newline) {
+		add_code(";\n");
+	}
 }
 
 void BackendGLSL::gen_data(const Symbol *dealiased)
@@ -2481,7 +2481,7 @@ void BackendGLSL::get_or_allocate_symbol(const Symbol & sym)
     std::set<std::string>::iterator iter = m_named_values.find(mangled_name);
 
     if (iter == m_named_values.end()) {
-		gen_typespec(dealiased->typespec(), mangled_name);
+		gen_typespec(dealiased->typespec(), mangled_name, true);
         m_named_values.insert(mangled_name);
     }
 }
@@ -2617,6 +2617,36 @@ void BackendGLSL::assign_initial_value(const Symbol & sym)
     }
 }
 
+void BackendGLSL::init_array_constants(const Symbol & sym)
+{
+    if (sym.valuesource() == Symbol::ConnectedVal || 
+		sym.typespec().is_closure_based() || 
+		sym.typespec().is_string_based()) {
+        return;
+	}
+
+    if (sym.has_init_ops() && 
+		sym.valuesource() == Symbol::DefaultVal) {
+        return;
+    }
+
+	Symbol* dealiased = sym.dealias();
+	std::string mangled_name = dealiased->mangled();
+
+    std::set<std::string>::iterator iter = m_named_values.find(mangled_name);
+
+    if (iter != m_named_values.end()) {
+		return;
+    }
+
+	gen_typespec(dealiased->typespec(), mangled_name, false);
+	add_code(" = ");
+	gen_data(&sym);
+	add_code(";\n");
+
+	m_named_values.insert(mangled_name);
+}
+
 bool BackendGLSL::build_instance(bool groupentry)
 {
 	// Make a layer function: void layer_func(ShaderGlobals*, GroupData*)
@@ -2679,12 +2709,15 @@ bool BackendGLSL::build_instance(bool groupentry)
         // Skip constants -- we always inline scalar constants, and for
         // array constants we will just use the pointers to the copy of
         // the constant that belongs to the instance.
-		//
-		// [Elvic] LLVM can share pointers to ConstantPool with OSL. 
-		// However for GLSL, we have to allocate symbol and assign 
-		// initial values for array constants.
-		if (s.symtype() == SymTypeConst && !s.typespec().is_array())
+		if (s.symtype() == SymTypeConst) {
+			// [Elvic] LLVM can share pointers to ConstantPool with OSL. 
+			// However for GLSL, we have to allocate symbol and assign 
+			// initial values for array constants.
+			if (s.is_constant() || s.typespec().is_array()) {
+				init_array_constants(s);
+			}
             continue;
+		}
         // Skip structure placeholders
         if (s.typespec().is_structure())
             continue;
@@ -2907,7 +2940,7 @@ void BackendGLSL::type_groupdata()
 			// Don't need "groupdata." prefix inside struct definition
 			std::string mangled_name = unique_layer_name + "_" + dealiased->mangled();
 			
-			gen_typespec(dealiased->typespec(), mangled_name);
+			gen_typespec(dealiased->typespec(), mangled_name, true);
         }
     }
 
