@@ -2693,7 +2693,12 @@ ShadingSystemImpl::compile_generic (const char *language,
     ShadingContext *ctx = get_context ();
     RuntimeOptimizer rop (*this, group, ctx);
     rop.set_raytypes (group.m_raytypes_on, group.m_raytypes_off);
+
+	// Hack for GLSL backend, keep this ID increasing to avoid name conflicts
+	static int last_newconst_id = 0;
+	rop.m_next_newconst = last_newconst_id;
     rop.run ();
+	last_newconst_id = rop.m_next_newconst;
 
     // Copy some info recorded by the RuntimeOptimizer into the group
     group.m_unknown_textures_needed = rop.m_unknown_textures_needed;

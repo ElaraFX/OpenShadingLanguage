@@ -295,8 +295,11 @@ void BackendGLSL::pop_function()
 
 void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & name, bool newline)
 {
+	if (newline) {
+		begin_code("");
+	}
     if (typespec.is_closure() || typespec.is_closure_array()) {
-        begin_code("closure_color ");
+        add_code("closure_color ");
 		add_code(format_var(name));
         if (typespec.is_unsized_array()) {
             add_code("[]");
@@ -304,7 +307,7 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
             add_code(Strutil::format("[%d]", typespec.arraylength()));
 		}
     } else if (typespec.structure() > 0) {
-		begin_code(typespec.structspec()->mangled());
+		add_code(typespec.structspec()->mangled());
 		add_code(" ");
 		add_code(format_var(name));
         if (typespec.is_unsized_array()) {
@@ -315,7 +318,7 @@ void BackendGLSL::gen_typespec(const TypeSpec & typespec, const std::string & na
     } else {
 		TypeDesc t = typespec.simpletype();
 		TypeDesc elemtype = t.elementtype();
-		begin_code(elemtype.c_str());
+		add_code(elemtype.c_str());
 		add_code(" ");
 		add_code(format_var(name));
 		if (typespec.is_unsized_array()) {
@@ -2639,6 +2642,11 @@ void BackendGLSL::init_array_constants(const Symbol & sym)
 		return;
     }
 
+	if (m_OpenCL) {
+		begin_code("__constant ");
+	} else {
+		begin_code("const ");
+	}
 	gen_typespec(dealiased->typespec(), mangled_name, false);
 	add_code(" = ");
 	gen_data(&sym);
@@ -2652,6 +2660,17 @@ bool BackendGLSL::build_instance(bool groupentry)
 	// Make a layer function: void layer_func(ShaderGlobals*, GroupData*)
     // Note that the GroupData* is passed as a void*.
     std::string unique_layer_name = format_var(Strutil::format("%s_%d", inst()->shadername().c_str(), inst()->id()));
+
+	// [Elvic] LLVM can share pointers to ConstantPool with OSL. 
+	// However for GLSL, we have to allocate symbol and assign 
+	// initial values for array constants.
+	BOOST_FOREACH (Symbol &s, inst()->symbols()) {
+		if (s.symtype() == SymTypeConst && 
+			s.is_constant() && 
+			s.typespec().is_array()) {
+			init_array_constants(s);
+		}
+	}
 
 	if (inst()->entry_layer()) {
 		begin_code("ENTRY_API void ");
@@ -2709,15 +2728,8 @@ bool BackendGLSL::build_instance(bool groupentry)
         // Skip constants -- we always inline scalar constants, and for
         // array constants we will just use the pointers to the copy of
         // the constant that belongs to the instance.
-		if (s.symtype() == SymTypeConst) {
-			// [Elvic] LLVM can share pointers to ConstantPool with OSL. 
-			// However for GLSL, we have to allocate symbol and assign 
-			// initial values for array constants.
-			if (s.is_constant() && s.typespec().is_array()) {
-				init_array_constants(s);
-			}
+		if (s.symtype() == SymTypeConst)
             continue;
-		}
         // Skip structure placeholders
         if (s.typespec().is_structure())
             continue;
