@@ -342,7 +342,7 @@ void BackendGLSL::gen_data(const Symbol *dealiased)
 			add_code("{");
 		}
 	}
-	for (int a = 0; a < t.numelements(); ++a) {
+	for (int a = 0, c = 0; a < t.numelements(); ++a) {
 		if (t.is_array()) {
 			add_code((a != 0) ? ", " : "");
 		}
@@ -360,27 +360,27 @@ void BackendGLSL::gen_data(const Symbol *dealiased)
 			}
 		}
 		if (t.basetype == TypeDesc::FLOAT) {
-			for (int j = 0; j < t.aggregate; ++j) {
+			for (int j = 0; j < t.aggregate; ++j, ++c) {
 				add_code((j != 0) ? ", " : "");
 				if (!m_OpenCL)
 				{
-					add_code("float(" + format_float(Strutil::format("%.9f", ((float *)dealiased->data())[j])) + ")");
+					add_code("float(" + format_float(Strutil::format("%.9f", ((float *)dealiased->data())[c])) + ")");
 				}
 				else
 				{
-					add_code(format_float(Strutil::format("%.9f", ((float *)dealiased->data())[j])) + "f");
+					add_code(format_float(Strutil::format("%.9f", ((float *)dealiased->data())[c])) + "f");
 				}
 			}
 		} else if (t.basetype == TypeDesc::INT) {
-			for (int j = 0; j < t.aggregate; ++j) {
+			for (int j = 0; j < t.aggregate; ++j, ++c) {
 				add_code((j != 0) ? ", " : "");
-				add_code(Strutil::format("%d", ((int *)dealiased->data())[j]));
+				add_code(Strutil::format("%d", ((int *)dealiased->data())[c]));
 			}
 		} else if (t.basetype == TypeDesc::STRING) {
-			for (int j = 0; j < t.aggregate; ++j) {
+			for (int j = 0; j < t.aggregate; ++j, ++c) {
 				add_code((j != 0) ? ", " : "");
 				add_code("\"");
-				add_code(Strutil::escape_chars(((ustring *)dealiased->data())[j].string()));
+				add_code(Strutil::escape_chars(((ustring *)dealiased->data())[c].string()));
 				add_code("\"");
 			}
 		} else {
