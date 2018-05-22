@@ -2713,7 +2713,7 @@ bool BackendGLSL::build_instance(bool groupentry)
 			// [Elvic] LLVM can share pointers to ConstantPool with OSL. 
 			// However for GLSL, we have to allocate symbol and assign 
 			// initial values for array constants.
-			if (s.is_constant() || s.typespec().is_array()) {
+			if (s.is_constant() && s.typespec().is_array()) {
 				init_array_constants(s);
 			}
             continue;
