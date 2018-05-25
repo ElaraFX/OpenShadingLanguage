@@ -1645,7 +1645,7 @@ bool BackendGLSL::build_op(int opnum)
 		} else {
 			add_code("0, ");
 		}
-		add_code(Strutil::format("%s, ", 
+		add_code(Strutil::format("attr_%s, ", 
 			Attribute.is_constant() ? 
 			Attribute.get_string().c_str() : "0"));
 		if (array_lookup) {
@@ -2297,7 +2297,11 @@ bool BackendGLSL::build_op(int opnum)
 		} else {
 			add_code(name.c_str());
 		}
-		add_code("(sg, ");
+		if (T) {
+			add_code("4(sg, ");
+		} else {
+			add_code("(sg, ");
+		}
 		gen_symbol(*S);
 		if (T) {
 			add_code(", ");
