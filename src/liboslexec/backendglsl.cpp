@@ -2330,6 +2330,10 @@ bool BackendGLSL::build_op(int opnum)
 
 		begin_code("");
 		gen_symbol(Result);
+
+		/* we don't support dynamic gettextureinfo */
+		add_code(" = 0;\n");
+		/*
 		add_code(" = gettextureinfo(");
 		gen_symbol(Filename);
 		add_code(", ");
@@ -2337,6 +2341,7 @@ bool BackendGLSL::build_op(int opnum)
 		add_code(", ");
 		gen_symbol(Data);
 		add_code(");\n");
+		*/
 
 		return true;
 	}
