@@ -1457,6 +1457,8 @@ public:
     }
 
     int raytype_queries () const { return m_raytype_queries; }
+	int raytypes_on () const { return m_raytypes_on; }
+	int raytypes_off () const { return m_raytypes_off; }
 
 private:
     // Put all the things that are read-only (after optimization) and

@@ -63,7 +63,9 @@ static ustring u_nop    ("nop"),
                u_isconnected ("isconnected"),
                u_setmessage ("setmessage"),
                u_getmessage ("getmessage"),
-               u_getattribute ("getattribute");
+               u_getattribute ("getattribute"),
+			   u_shadow ("shadow"),
+			   u_transparent ("transparent");
 
 
 OSL_NAMESPACE_ENTER
@@ -3186,6 +3188,23 @@ RuntimeOptimizer::run ()
             }
         }
     }
+
+	int shadowbit = shadingsys().raytype_bit(u_shadow);
+	if (group().raytypes_on() == shadowbit && 
+		group().raytypes_off() == (~shadowbit)) {
+		bool has_transparent = false;
+		for (std::set<ustring>::iterator iter = m_closures_needed.begin(); 
+			iter != m_closures_needed.end(); ++ iter) {
+			if (*iter == u_transparent) {
+				has_transparent = true;
+				break;
+			}
+		}
+		if (!has_transparent) {
+			does_nothing = true;
+		}
+	}
+
     group().does_nothing (does_nothing);
 
     m_stat_specialization_time = rop_timer();
